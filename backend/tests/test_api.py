@@ -1,0 +1,178 @@
+import pytest
+
+from app.seed.demo_data import CURRENT_SEASON
+
+
+class TestTeamsAPI:
+    def test_list_teams_returns_all_32(self, client):
+        resp = client.get("/api/teams")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 32
+
+    def test_get_team_404(self, client):
+        resp = client.get("/api/teams/999999")
+        assert resp.status_code == 404
+
+    def test_team_cap_has_consistent_math(self, client):
+        resp = client.get("/api/teams/1/cap", params={"season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        cap = resp.json()
+        assert cap["cap_space"] == round(cap["salary_cap"] - cap["top51_commitments"] - cap["dead_cap"], 2)
+        assert cap["effective_cap_space"] == round(
+            cap["salary_cap"] - cap["cap_commitments"] - cap["dead_cap"], 2
+        )
+
+    def test_team_cap_missing_season_404(self, client):
+        resp = client.get("/api/teams/1/cap", params={"season": 1999})
+        assert resp.status_code == 404
+
+    def test_roster_pct_of_cap_matches_cap_hit(self, client):
+        resp = client.get("/api/teams/1/roster", params={"season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        roster = resp.json()
+        assert len(roster) > 0
+        for row in roster[:5]:
+            assert row["current_cap_hit"] >= 0
+            if row["pct_of_team_cap"] is not None:
+                assert row["pct_of_team_cap"] >= 0
+
+    def test_dashboard_future_cap_covers_projection_window(self, client):
+        resp = client.get("/api/teams/1/dashboard", params={"season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        future_seasons = [row["season"] for row in body["future_cap"]]
+        assert future_seasons == sorted(future_seasons)
+        assert all(s > CURRENT_SEASON for s in future_seasons)
+
+    def test_position_spending_sums_to_active_commitments(self, client):
+        cap_resp = client.get("/api/teams/1/cap", params={"season": CURRENT_SEASON})
+        spend_resp = client.get("/api/teams/1/spending", params={"season": CURRENT_SEASON})
+        assert spend_resp.status_code == 200
+        total_spend = sum(row["cap_spending"] for row in spend_resp.json())
+        assert total_spend == pytest.approx(cap_resp.json()["cap_commitments"], abs=0.01)
+
+
+class TestPlayersAPI:
+    def test_list_players_filter_by_team(self, client):
+        resp = client.get("/api/players", params={"team_id": 1})
+        assert resp.status_code == 200
+        players = resp.json()
+        assert len(players) > 0
+        assert all(p["team_id"] == 1 for p in players)
+
+    def test_search_by_name(self, client):
+        all_players = client.get("/api/players", params={"team_id": 1}).json()
+        target_name = all_players[0]["name"]
+        resp = client.get("/api/players", params={"search": target_name.split()[0]})
+        assert resp.status_code == 200
+        assert any(p["name"] == target_name for p in resp.json())
+
+    def test_player_profile_404(self, client):
+        resp = client.get("/api/players/999999")
+        assert resp.status_code == 404
+
+    def test_player_profile_has_timeline_and_decision_points(self, client):
+        players = client.get("/api/players", params={"team_id": 1}).json()
+        player_id = players[0]["id"]
+        resp = client.get(f"/api/players/{player_id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["financial_timeline"]) == body["contract_end"] - body["contract_start"] + 1
+        kinds = {p["kind"] for p in body["decision_points"]}
+        assert "expiration" in kinds
+
+    def test_financial_timeline_cap_hit_matches_components(self, client):
+        players = client.get("/api/players", params={"team_id": 1}).json()
+        player_id = players[0]["id"]
+        body = client.get(f"/api/players/{player_id}").json()
+        for year in body["financial_timeline"]:
+            expected = round(
+                year["base_salary"] + year["signing_bonus_proration"] + year["roster_bonus"] + year["incentives"],
+                2,
+            )
+            assert year["cap_hit"] == expected
+
+
+class TestContractsAPI:
+    def test_search_contracts_by_aav_range(self, client):
+        resp = client.get("/api/contracts", params={"min_aav": 20_000_000, "max_aav": 60_000_000})
+        assert resp.status_code == 200
+        for c in resp.json():
+            assert 20_000_000 <= c["annual_value"] <= 60_000_000
+
+    def test_search_contracts_by_position(self, client):
+        resp = client.get("/api/contracts", params={"position": "QB"})
+        assert resp.status_code == 200
+        assert all(c["position"] == "QB" for c in resp.json())
+
+    def test_get_contract_404(self, client):
+        resp = client.get("/api/contracts/999999")
+        assert resp.status_code == 404
+
+    def test_release_standard_matches_cap_engine(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.post(
+            f"/api/contracts/{contract_id}/release",
+            json={"release_season": CURRENT_SEASON, "june1": False},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["after_dead_cap_next_year"] == 0.0
+        assert body["total_dead_cap"] == body["after_dead_cap_current_year"]
+        assert body["current_year_cap_savings"] == round(body["before_cap_hit"] - body["total_dead_cap"], 2)
+
+    def test_release_june1_splits_dead_cap(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        multi_year = [c for c in contracts if c["years_remaining"] >= 2]
+        assert multi_year, "expected at least one multi-year contract in demo data"
+        contract_id = multi_year[0]["id"]
+
+        standard = client.post(
+            f"/api/contracts/{contract_id}/release",
+            json={"release_season": CURRENT_SEASON, "june1": False},
+        ).json()
+        june1 = client.post(
+            f"/api/contracts/{contract_id}/release",
+            json={"release_season": CURRENT_SEASON, "june1": True},
+        ).json()
+
+        assert june1["after_dead_cap_next_year"] > 0
+        assert standard["total_dead_cap"] == june1["total_dead_cap"]
+        assert june1["after_dead_cap_current_year"] <= standard["after_dead_cap_current_year"]
+
+    def test_release_nonexistent_contract_404(self, client):
+        resp = client.post("/api/contracts/999999/release", json={"release_season": CURRENT_SEASON})
+        assert resp.status_code == 404
+
+    def test_restructure_rejects_over_max_convert(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.post(
+            f"/api/contracts/{contract_id}/restructure",
+            json={"restructure_season": CURRENT_SEASON, "amount_to_convert": 10**12},
+        )
+        assert resp.status_code == 400
+
+    def test_restructure_savings_equals_future_increase(self, client):
+        contracts = client.get(
+            "/api/contracts", params={"team_id": 1, "contract_status": "active"}
+        ).json()
+        multi_year = [c for c in contracts if c["years_remaining"] >= 2]
+        contract_id = multi_year[0]["id"]
+        resp = client.post(
+            f"/api/contracts/{contract_id}/restructure",
+            json={"restructure_season": CURRENT_SEASON, "amount_to_convert": 1_000_000},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["current_year_savings"] == round(sum(body["future_cap_hit_increases"].values()), 2)
+
+
+class TestHealthAndMeta:
+    def test_health(self, client):
+        assert client.get("/api/health").status_code == 200
+
+    def test_meta_labels_demo_data(self, client):
+        body = client.get("/api/meta").json()
+        assert "DEMO DATA" in body["demo_disclaimer"]
