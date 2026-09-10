@@ -118,6 +118,21 @@ conceptually distinct rather than treating them as the same number.
   combined first-year cap impact, using a simplified (clearly labeled)
   per-round cost estimate rather than the real rookie wage scale.
 
+**Phase 5 — Historical Analytics & ML**
+
+- **Comparable Contract Search** — a transparent, distance-based similarity
+  search over Cap Ledger's dataset (same position, within 5 years of age),
+  not machine-learned.
+- **Model-Estimated Contract Value** — Cap Ledger's one genuine ML model: a
+  linear regression trained on its own synthetic dataset to estimate AAV
+  from position/age/contract length, with full model versioning (R², MAE,
+  dataset size, train/test split, trained-at timestamp) and per-prediction
+  explainability (coefficient-driven "drivers"). Every prediction is clearly
+  labeled a model estimate, never a fact — see
+  [`docs/ml_documentation.md`](docs/ml_documentation.md), which also
+  explains why a contract-risk ML model was deliberately *not* built (no
+  real outcome data to train one against).
+
 ## Screenshots
 
 | Dashboard | Cap Overview |
@@ -136,11 +151,11 @@ conceptually distinct rather than treating them as the same number.
 |---|---|
 | ![Financial Flexibility](docs/screenshots/financial_flexibility.png) | ![Position Spending](docs/screenshots/position_spending.png) |
 
-| Financial Flexibility Forecast | Free-Agent Planning |
+| Financial Flexibility Forecast | Analytics & Models (ML) |
 |---|---|
-| ![Flexibility Forecast](docs/screenshots/flexibility_forecast.png) | ![Free-Agent Planning](docs/screenshots/free_agent_planning.png) |
+| ![Flexibility Forecast](docs/screenshots/flexibility_forecast.png) | ![Analytics & Models](docs/screenshots/analytics_models.png) |
 
-Roster Ledger, Contract Explorer, the Extension Simulator, and Rookie Planning: see `docs/screenshots/`.
+Roster Ledger, Contract Explorer, the Extension Simulator, Free-Agent Planning, and Rookie Planning: see `docs/screenshots/`.
 
 ## Technology stack
 
@@ -210,8 +225,9 @@ phases — see
   [`docs/contract_risk_methodology.md`](docs/contract_risk_methodology.md),
   [`docs/contract_value_methodology.md`](docs/contract_value_methodology.md)
   — the Phase 3 scoring methodologies (all deterministic, no ML).
-- [`docs/ml_documentation.md`](docs/ml_documentation.md) — not yet
-  implemented; documented as reserved for Phase 5.
+- [`docs/ml_documentation.md`](docs/ml_documentation.md) — the one ML model
+  Cap Ledger trains and serves (contract-value estimation), and why a
+  contract-risk ML model was deliberately not built.
 - [`docs/limitations.md`](docs/limitations.md) — every known simplification.
 
 ## Data sources
@@ -300,6 +316,9 @@ GET  /api/analytics/position-spending-comparison?team_id=&season=
 GET  /api/teams/{id}/financial-flexibility-forecast?growth_rate=&sensitivity_delta=
 POST /api/teams/{id}/free-agent-planning  { position, target_aav, contract_length, guaranteed_money, start_season }
 POST /api/teams/{id}/rookie-planning      { season, picks: [{ draft_round, position? }] }
+GET  /api/analytics/comparable-contracts?position=&age=&aav=&limit=
+GET  /api/ml/contract-value-projection?position=&age=&contract_length_years=
+GET  /api/ml/model-info
 ```
 
 ## Testing
@@ -310,7 +329,7 @@ source venv/bin/activate
 python -m pytest -q
 ```
 
-108 tests across three suites:
+123 tests across four suites:
 
 - `tests/test_cap_engine.py` — hand-calculated scenarios for signing-bonus
   proration, cap hits, standard/post-June-1 dead cap, restructuring
@@ -330,7 +349,12 @@ python -m pytest -q
   dead-cap dashboard, the Phase 3 analytics endpoints, the Phase 4
   flexibility-forecast/free-agent/rookie-planning endpoints (including that
   the current season is provably unaffected by the growth-rate assumption),
-  validation errors, and 404s.
+  the Phase 5 ML and comparable-contracts endpoints, validation errors, and
+  404s.
+- `tests/test_ml_contract_value.py` — trains the contract-value model
+  against the real seeded dataset and verifies the training pipeline
+  produces sane, deterministic, explainable output (not that it predicts
+  any specific real-world value — the training data is synthetic).
 
 All financial calculations are covered by tests using known, independently
 verifiable inputs and outputs — see `test_cap_engine.py` for the worked
@@ -381,11 +405,14 @@ This repository covers:
 - **Phase 4 (Scenario Analysis)** — a multi-year Financial Flexibility
   Forecast with genuine growth-rate sensitivity and "what would change our
   mind" framing, free-agent planning, and rookie contract planning.
+- **Phase 5 (Historical Analytics & ML)** — comparable-contract search and
+  one genuine, versioned, explainable ML model (linear regression) for
+  contract-value estimation, with a documented decision not to build an
+  ML contract-risk model (no real outcome data to train against).
 
-Later phases (see the project brief) add historical-contract comparisons,
-competitive-timeline classification, and optional ML-assisted contract-value
-models — each layered on top of the same deterministic cap engine and schema
-built here.
+Later phases (see the project brief) add a genuine multi-season historical
+contract archive and competitive-timeline classification — each layered on
+top of the same deterministic cap engine and schema built here.
 
 ## Independent-project disclaimer
 

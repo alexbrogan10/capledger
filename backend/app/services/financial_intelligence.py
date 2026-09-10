@@ -309,3 +309,68 @@ def calculate_market_comparison(
         sample_size=len(same_position),
         cost_vs_position_median=round(aav - position_median, 2),
     )
+
+
+# ---------------------------------------------------------------------------
+# Comparable Contract Search (Phase 5)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ComparableContract:
+    contract_id: int
+    player_name: str
+    position: str
+    age: int
+    aav: float
+    years_remaining: int
+    guaranteed_money: float
+    similarity_score: float
+    """0-100; 100 = identical age and AAV to the query, within the same position."""
+    age_difference: int
+    aav_difference: float
+
+
+def find_comparable_contracts(
+    *,
+    position: str,
+    age: int,
+    aav: float,
+    candidates: list[dict],
+    limit: int = 10,
+    max_age_diff: int = 5,
+) -> list[ComparableContract]:
+    """Finds the most similar contracts to a hypothetical or real
+    (position, age, aav) query, restricted to the same position. Similarity
+    is a simple, transparent inverse-distance score over normalized age and
+    AAV gaps — not a machine-learned similarity metric.
+
+    ``candidates`` items: {"contract_id", "player_name", "position", "age",
+    "aav", "years_remaining", "guaranteed_money"}.
+    """
+    same_position = [c for c in candidates if c["position"] == position and abs(c["age"] - age) <= max_age_diff]
+    if not same_position:
+        return []
+
+    max_aav = max(c["aav"] for c in same_position) or 1.0
+
+    scored: list[ComparableContract] = []
+    for c in same_position:
+        age_diff = abs(c["age"] - age)
+        aav_diff = abs(c["aav"] - aav)
+        # Normalize each gap to 0-1 and combine; age weighted less than AAV.
+        age_component = min(1.0, age_diff / max(max_age_diff, 1))
+        aav_component = min(1.0, aav_diff / max_aav)
+        distance = 0.35 * age_component + 0.65 * aav_component
+        similarity = round(clamp((1 - distance) * 100), 1)
+        scored.append(
+            ComparableContract(
+                contract_id=c["contract_id"], player_name=c["player_name"], position=c["position"],
+                age=c["age"], aav=c["aav"], years_remaining=c["years_remaining"],
+                guaranteed_money=c["guaranteed_money"], similarity_score=similarity,
+                age_difference=c["age"] - age, aav_difference=round(c["aav"] - aav, 2),
+            )
+        )
+
+    scored.sort(key=lambda c: c.similarity_score, reverse=True)
+    return scored[:limit]

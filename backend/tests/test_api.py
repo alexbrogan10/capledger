@@ -412,6 +412,51 @@ class TestPhase4API:
         assert resp.status_code == 422  # pydantic field validation (le=7)
 
 
+class TestPhase5API:
+    def test_model_info_reports_metrics(self, client):
+        resp = client.get("/api/ml/model-info")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["dataset_size"] > 0
+        assert "QB" in body["positions_seen"]
+
+    def test_contract_value_projection_returns_drivers(self, client):
+        resp = client.get(
+            "/api/ml/contract-value-projection",
+            params={"position": "WR", "age": 27, "contract_length_years": 3},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["predicted_aav"] >= 0
+        assert len(body["drivers"]) == 3
+        assert "ESTIMATE" in body["disclaimer"]
+
+    def test_contract_value_projection_validates_age_range(self, client):
+        resp = client.get(
+            "/api/ml/contract-value-projection",
+            params={"position": "WR", "age": 5, "contract_length_years": 3},
+        )
+        assert resp.status_code == 422
+
+    def test_comparable_contracts_same_position_only(self, client):
+        resp = client.get(
+            "/api/analytics/comparable-contracts",
+            params={"position": "QB", "age": 28, "aav": 20_000_000, "limit": 5},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert all(r["position"] == "QB" for r in body["results"])
+        assert all(0 <= r["similarity_score"] <= 100 for r in body["results"])
+
+    def test_comparable_contracts_ranked_by_similarity_desc(self, client):
+        resp = client.get(
+            "/api/analytics/comparable-contracts",
+            params={"position": "EDGE", "age": 27, "aav": 20_000_000, "limit": 10},
+        )
+        scores = [r["similarity_score"] for r in resp.json()["results"]]
+        assert scores == sorted(scores, reverse=True)
+
+
 class TestHealthAndMeta:
     def test_health(self, client):
         assert client.get("/api/health").status_code == 200

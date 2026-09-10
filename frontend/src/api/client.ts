@@ -1,9 +1,11 @@
 import type {
   CapProjection,
+  ComparableContracts,
   Concentration,
   ContractListItem,
   ContractRisk,
   ContractValue,
+  ContractValueProjection,
   Dashboard,
   DeadCapDashboard,
   ExtensionImpact,
@@ -142,4 +144,12 @@ export const api = {
 
   rookiePlanning: (teamId: number, season: number, picks: { draft_round: number; position?: string }[]) =>
     post<RookiePlanning>(`/teams/${teamId}/rookie-planning`, { season, picks }),
+
+  contractValueProjection: (position: string, age: number, contractLengthYears: number) =>
+    get<ContractValueProjection>("/ml/contract-value-projection", {
+      position, age, contract_length_years: contractLengthYears,
+    }),
+
+  comparableContracts: (position: string, age: number, aav: number, limit = 10) =>
+    get<ComparableContracts>("/analytics/comparable-contracts", { position, age, aav, limit }),
 };

@@ -18,6 +18,7 @@ import { PositionSpendingPage } from "./pages/PositionSpendingPage";
 import { FlexibilityForecastPage } from "./pages/FlexibilityForecastPage";
 import { FreeAgentPlanningPage } from "./pages/FreeAgentPlanningPage";
 import { RookiePlanningPage } from "./pages/RookiePlanningPage";
+import { AnalyticsModelsPage } from "./pages/AnalyticsModelsPage";
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/flexibility-forecast" element={<FlexibilityForecastPage />} />
             <Route path="/free-agent-planning" element={<FreeAgentPlanningPage />} />
             <Route path="/rookie-planning" element={<RookiePlanningPage />} />
+            <Route path="/analytics-models" element={<AnalyticsModelsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

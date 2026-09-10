@@ -37,6 +37,7 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
       { to: "/financial-flexibility", label: "Financial Flexibility" },
       { to: "/flexibility-forecast", label: "Flexibility Forecast" },
       { to: "/position-spending", label: "Position Spending" },
+      { to: "/analytics-models", label: "Analytics & Models" },
     ],
   },
 ];

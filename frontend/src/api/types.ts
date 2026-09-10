@@ -393,3 +393,49 @@ export interface RookiePlanning {
   cap_space_after: number;
   assumptions: string[];
 }
+
+export interface ModelMetadata {
+  name: string;
+  version: string;
+  trained_at: string;
+  dataset_size: number;
+  train_size: number;
+  test_size: number;
+  features: string[];
+  target: string;
+  r2_score: number;
+  mean_absolute_error: number;
+  positions_seen: string[];
+}
+
+export interface ContractValueProjection {
+  position: string;
+  age: number;
+  contract_length_years: number;
+  predicted_aav: number;
+  baseline_aav: number;
+  drivers: string[];
+  model: ModelMetadata;
+  disclaimer: string;
+}
+
+export interface ComparableContract {
+  contract_id: number;
+  player_name: string;
+  position: string;
+  age: number;
+  aav: number;
+  years_remaining: number;
+  guaranteed_money: number;
+  similarity_score: number;
+  age_difference: number;
+  aav_difference: number;
+}
+
+export interface ComparableContracts {
+  query_position: string;
+  query_age: number;
+  query_aav: number;
+  results: ComparableContract[];
+  methodology: string;
+}

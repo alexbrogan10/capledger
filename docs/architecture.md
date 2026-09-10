@@ -39,11 +39,16 @@ Office Analytics Suite"; this repository implements Cap Ledger only.
 - `services/decision_points.py` — analytical (non-predictive) flags on a
   contract's timeline: expiration, large cap-hit years, potential release
   points, possible extension windows.
-- `services/financial_intelligence.py` — Phase 3 deterministic scoring:
-  financial flexibility, financial concentration, contract risk, and
-  contract-vs-market comparison. No ML; every score is a documented,
-  hand-verifiable formula (see `docs/financial_flexibility.md`,
-  `docs/contract_risk_methodology.md`, `docs/contract_value_methodology.md`).
+- `services/financial_intelligence.py` — Phase 3/5 deterministic scoring:
+  financial flexibility, financial concentration, contract risk,
+  contract-vs-market comparison, and comparable-contract search. No ML;
+  every score is a documented, hand-verifiable formula (see
+  `docs/financial_flexibility.md`, `docs/contract_risk_methodology.md`,
+  `docs/contract_value_methodology.md`).
+- `ml/contract_value_model.py` — the one place Cap Ledger trains and serves
+  an ML model (Phase 5): a linear regression estimating AAV from
+  position/age/contract length, trained lazily against the live database
+  and fully documented in `docs/ml_documentation.md`.
 - `schemas/` — Pydantic request/response models.
 - `api/` — FastAPI routers (`teams`, `players`, `contracts`).
 - `seed/` — the synthetic demo-data generator (see `docs/data_sources.md`).
@@ -106,8 +111,17 @@ rookie-cost estimate → cap impact of drafting several players). All three
 reuse the same `cap_engine` and `financial_intelligence` primitives rather
 than introducing new calculation logic.
 
-Tables and endpoints for later phases (historical contracts, team needs,
-competitive-timeline classification, ML-driven contract value models) are
+**Phase 5** — Historical Analytics & ML: a comparable-contract search
+(`GET /api/analytics/comparable-contracts`, a transparent distance formula —
+not ML) and one genuine, versioned ML model, `contract_value_linear_v1`
+(`backend/app/ml/contract_value_model.py`, `GET /api/ml/contract-value-projection`,
+`GET /api/ml/model-info`) — a linear regression trained on Cap Ledger's own
+synthetic dataset, fully documented in `docs/ml_documentation.md` including
+why a contract-risk ML model was deliberately *not* built (no real outcome
+labels to train against).
+
+Tables and endpoints for later phases (a genuine multi-season historical
+contract archive, team needs, competitive-timeline classification) are
 intentionally **not** built yet, per the roadmap's phased approach and the
 project's build-quality rule against building ahead of validated need. The
 schema and API are structured so those phases can be added without

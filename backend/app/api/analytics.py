@@ -17,12 +17,14 @@ from app.schemas.analytics import (
     PositionSpendingComparisonRow,
     RiskFactorOut,
 )
+from app.schemas.ml import ComparableContractOut, ComparableContractsOut
 from app.seed.demo_data import CURRENT_SEASON, DEMO_LEAGUE_CAP
 from app.services.financial_intelligence import (
     calculate_contract_risk,
     calculate_financial_concentration,
     calculate_financial_flexibility,
     calculate_market_comparison,
+    find_comparable_contracts,
 )
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -302,4 +304,49 @@ def position_spending_comparison(team_id: int, season: int = Query(CURRENT_SEASO
 
     return PositionSpendingComparisonOut(
         team_id=team_id, season=season, rows=sorted(rows, key=lambda r: r.team_cap_spending, reverse=True)
+    )
+
+
+@router.get("/comparable-contracts", response_model=ComparableContractsOut)
+def comparable_contracts(
+    position: str,
+    age: int = Query(..., ge=18, le=50),
+    aav: float = Query(..., gt=0),
+    limit: int = Query(10, le=50),
+    db: Session = Depends(get_db),
+):
+    """Historical Contract Analysis / Contract Similarity search (project
+    brief sections 30-31): finds the most similar active contracts to a
+    given (position, age, AAV) query within Cap Ledger's own dataset.
+    Similarity is a transparent, hand-verifiable inverse-distance score —
+    not an ML-learned similarity metric. See docs/data_sources.md: this
+    searches the current synthetic demo roster, not a genuine multi-season
+    historical archive.
+    """
+    rows = (
+        db.query(Player.id, Player.name, Player.position, Player.age, Contract.id, Contract.annual_value, Contract.contract_end, Contract.guaranteed_money)
+        .join(Contract, Contract.player_id == Player.id)
+        .filter(Contract.contract_status == "active")
+        .all()
+    )
+    candidates = [
+        {
+            "contract_id": contract_id, "player_name": name, "position": pos, "age": p_age,
+            "aav": float(aav_val), "years_remaining": max(0, end - CURRENT_SEASON + 1),
+            "guaranteed_money": float(guaranteed),
+        }
+        for _, name, pos, p_age, contract_id, aav_val, end, guaranteed in rows
+    ]
+
+    results = find_comparable_contracts(position=position, age=age, aav=aav, candidates=candidates, limit=limit)
+
+    return ComparableContractsOut(
+        query_position=position, query_age=age, query_aav=aav,
+        results=[ComparableContractOut(**r.__dict__) for r in results],
+        methodology=(
+            "Similarity combines a normalized age gap (35% weight) and a normalized AAV gap (65% "
+            "weight) within the same position, restricted to contracts within 5 years of age. This is "
+            "a transparent distance formula, not a machine-learned similarity model — see "
+            "docs/contract_value_methodology.md."
+        ),
     )

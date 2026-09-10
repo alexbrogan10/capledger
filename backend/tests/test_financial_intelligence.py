@@ -5,6 +5,7 @@ from app.services.financial_intelligence import (
     calculate_financial_concentration,
     calculate_financial_flexibility,
     calculate_market_comparison,
+    find_comparable_contracts,
 )
 
 
@@ -151,3 +152,38 @@ class TestMarketComparison:
         result = calculate_market_comparison(20_000_000, "WR", 27, self._league(), age_band=1)
         # Only ages 26,27,29(no, |29-27|=2>1) -> ages within 1 of 27: 26,27 -> aavs 15M,20M
         assert result.age_band_median_aav in (15_000_000.0, 20_000_000.0)
+
+
+class TestComparableContracts:
+    def _candidates(self):
+        return [
+            {"contract_id": 1, "player_name": "A", "position": "WR", "age": 27, "aav": 20_000_000, "years_remaining": 2, "guaranteed_money": 10_000_000},
+            {"contract_id": 2, "player_name": "B", "position": "WR", "age": 28, "aav": 19_500_000, "years_remaining": 3, "guaranteed_money": 12_000_000},
+            {"contract_id": 3, "player_name": "C", "position": "WR", "age": 35, "aav": 2_000_000, "years_remaining": 1, "guaranteed_money": 0},
+            {"contract_id": 4, "player_name": "D", "position": "QB", "age": 27, "aav": 20_000_000, "years_remaining": 2, "guaranteed_money": 10_000_000},
+        ]
+
+    def test_only_same_position_returned(self):
+        results = find_comparable_contracts(position="WR", age=27, aav=20_000_000, candidates=self._candidates())
+        assert all(r.position == "WR" for r in results)
+        assert not any(r.contract_id == 4 for r in results)
+
+    def test_closest_match_ranks_first(self):
+        results = find_comparable_contracts(position="WR", age=27, aav=20_000_000, candidates=self._candidates())
+        assert results[0].contract_id == 1  # exact match
+        assert results[0].similarity_score == 100.0
+
+    def test_far_away_candidate_excluded_by_age_gap(self):
+        results = find_comparable_contracts(
+            position="WR", age=27, aav=20_000_000, candidates=self._candidates(), max_age_diff=5
+        )
+        # Player C is 8 years older than the query -> excluded.
+        assert not any(r.contract_id == 3 for r in results)
+
+    def test_limit_respected(self):
+        results = find_comparable_contracts(position="WR", age=27, aav=20_000_000, candidates=self._candidates(), limit=1)
+        assert len(results) == 1
+
+    def test_no_candidates_returns_empty(self):
+        results = find_comparable_contracts(position="TE", age=27, aav=1, candidates=self._candidates())
+        assert results == []

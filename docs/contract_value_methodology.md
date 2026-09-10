@@ -37,3 +37,20 @@ player's true on-field value, and every response carries a disclaimer to
 that effect. A future phase with real performance data could extend this
 into a genuine value-vs-cost comparison without changing this endpoint's
 shape.
+
+## Comparable Contract Search (Phase 5)
+
+`find_comparable_contracts()`, exposed via `GET /api/analytics/comparable-contracts`,
+extends this into a ranked search (project brief section 30 "Historical
+Contract Analysis" / section 31 "Contract Market Analysis"): given a
+position, age, and AAV, it returns the most similar active contracts in the
+dataset, restricted to the same position and within 5 years of age.
+Similarity is a transparent inverse-distance formula — 35% weight on the
+normalized age gap, 65% on the normalized AAV gap — not a machine-learned
+similarity metric. See `docs/ml_documentation.md` for the one place Cap
+Ledger does use a trained model (a linear regression estimating AAV from
+position/age/length), which is a separate, complementary tool from this
+distance-based search.
+
+Note: this searches Cap Ledger's current synthetic roster snapshot, not a
+genuine multi-season historical archive — see `docs/data_sources.md`.
