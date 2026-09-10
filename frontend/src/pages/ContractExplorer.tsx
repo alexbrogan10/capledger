@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { ContractListItem } from "../api/types";
 import { Card, ErrorState, LoadingState } from "../components/ui";
 import { useAppState } from "../lib/AppState";
+import { downloadCsv } from "../lib/csv";
 import { formatMoney } from "../lib/format";
 
 export function ContractExplorer() {
@@ -53,13 +54,30 @@ export function ContractExplorer() {
 
   if (error) return <ErrorState message={error} />;
 
+  const exportCsv = () => {
+    if (!contracts) return;
+    downloadCsv(
+      `contracts_${season}.csv`,
+      contracts.map((c) => ({
+        player: c.player_name, team: c.team_abbreviation, position: c.position, age: c.age,
+        years_remaining: c.years_remaining, aav: c.annual_value, cap_hit: c.current_cap_hit,
+        guaranteed_money: c.guaranteed_money, status: c.contract_status,
+      }))
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-ink-900">Contract Explorer</h1>
-        <p className="text-sm text-ink-500">
-          Search active contracts league-wide. Select up to two to compare side by side.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-ink-900">Contract Explorer</h1>
+          <p className="text-sm text-ink-500">
+            Search active contracts league-wide. Select up to two to compare side by side.
+          </p>
+        </div>
+        <button onClick={exportCsv} className="rounded border border-ink-200 px-3 py-1.5 text-sm text-ink-700 hover:bg-ink-50">
+          Export CSV
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">

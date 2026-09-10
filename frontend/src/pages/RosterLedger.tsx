@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { RosterRow } from "../api/types";
 import { Badge, ErrorState, LoadingState } from "../components/ui";
 import { useAppState } from "../lib/AppState";
+import { downloadCsv } from "../lib/csv";
 import { formatMoney, formatPct } from "../lib/format";
 
 type SortKey = keyof RosterRow;
@@ -72,13 +73,31 @@ export function RosterLedger() {
   if (error) return <ErrorState message={error} />;
   if (!rows) return <LoadingState />;
 
+  const exportCsv = () => {
+    downloadCsv(
+      `${team?.abbreviation ?? "team"}_roster_${season}.csv`,
+      filtered.map((r) => ({
+        player: r.player_name, position: r.position, age: r.age,
+        years_remaining: r.contract_years_remaining, aav: r.annual_value,
+        current_salary: r.current_salary, cap_hit: r.current_cap_hit,
+        guaranteed_money: r.guaranteed_money, dead_cap_if_released: r.dead_cap_if_released ?? "",
+        pct_of_cap: r.pct_of_team_cap ?? "", status: r.contract_status,
+      }))
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-ink-900">Roster Ledger</h1>
-        <p className="text-sm text-ink-500">
-          {team?.name} · {season} · {filtered.length} of {rows.length} roster entries
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-ink-900">Roster Ledger</h1>
+          <p className="text-sm text-ink-500">
+            {team?.name} · {season} · {filtered.length} of {rows.length} roster entries
+          </p>
+        </div>
+        <button onClick={exportCsv} className="rounded border border-ink-200 px-3 py-1.5 text-sm text-ink-700 hover:bg-ink-50">
+          Export CSV
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">

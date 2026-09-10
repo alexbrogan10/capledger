@@ -133,6 +133,22 @@ conceptually distinct rather than treating them as the same number.
   explains why a contract-risk ML model was deliberately *not* built (no
   real outcome data to train one against).
 
+**Phase 6 — Production Polish**
+
+- **Contract Decision Report** — a print-ready, PDF-exportable executive
+  report per player, matching the product brief's exact report format
+  (player/contract summary, year-by-year timeline, Keep/Restructure/
+  Release/Trade options, decision points, "what could change this").
+- **CSV export** on the Roster Ledger and Contract Explorer.
+- **Code-split frontend** — every page loads lazily and Recharts ships as
+  its own chunk, cutting the initial JS bundle from ~613KB to ~180KB
+  (gzipped) with no loss of functionality.
+- **CI** (`.github/workflows/ci.yml`) — backend tests run against a real
+  Postgres service container, frontend type-checks and builds, on every
+  push and pull request.
+- Additional edge-case tests for boundary contract structures (all-bonus
+  contracts, one-year deals) and malformed API requests.
+
 ## Screenshots
 
 | Dashboard | Cap Overview |
@@ -329,7 +345,7 @@ source venv/bin/activate
 python -m pytest -q
 ```
 
-123 tests across four suites:
+134 tests across five suites:
 
 - `tests/test_cap_engine.py` — hand-calculated scenarios for signing-bonus
   proration, cap hits, standard/post-June-1 dead cap, restructuring
@@ -355,6 +371,14 @@ python -m pytest -q
   against the real seeded dataset and verifies the training pipeline
   produces sane, deterministic, explainable output (not that it predicts
   any specific real-world value — the training data is synthetic).
+- `tests/test_edge_cases.py` — boundary contract structures (all-bonus
+  contracts, zero-bonus contracts, one-year deals), malformed API requests
+  (missing fields, negative amounts, invalid draft rounds → 422s), and a
+  negative-cap-growth-rate projection.
+
+CI (`.github/workflows/ci.yml`) runs the full backend suite against a real
+Postgres service container, and the frontend build, on every push and pull
+request.
 
 All financial calculations are covered by tests using known, independently
 verifiable inputs and outputs — see `test_cap_engine.py` for the worked
@@ -409,10 +433,13 @@ This repository covers:
   one genuine, versioned, explainable ML model (linear regression) for
   contract-value estimation, with a documented decision not to build an
   ML contract-risk model (no real outcome data to train against).
+- **Phase 6 (Production Polish)** — a print/PDF-exportable Contract
+  Decision Report, CSV export, a code-split frontend bundle, CI, and
+  additional edge-case test coverage.
 
-Later phases (see the project brief) add a genuine multi-season historical
-contract archive and competitive-timeline classification — each layered on
-top of the same deterministic cap engine and schema built here.
+Not yet built: a genuine multi-season historical contract archive and
+competitive-timeline classification (see the project brief) — each would
+layer on top of the same deterministic cap engine and schema built here.
 
 ## Independent-project disclaimer
 

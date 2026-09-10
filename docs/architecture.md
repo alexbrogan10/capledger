@@ -120,6 +120,18 @@ synthetic dataset, fully documented in `docs/ml_documentation.md` including
 why a contract-risk ML model was deliberately *not* built (no real outcome
 labels to train against).
 
+**Phase 6** — Production polish: a Contract Decision Report page
+(`/contract-report/:playerId`, matching the exact report format in the
+product brief) with a print stylesheet for PDF export; CSV export on the
+Roster Ledger and Contract Explorer; route-level code-splitting
+(`React.lazy`/`Suspense` per page, with Recharts split into its own chunk)
+that cut the initial JS bundle from ~613KB to ~180KB gzip; a GitHub Actions
+CI workflow (`.github/workflows/ci.yml`) running the backend test suite
+against a real Postgres service container and the frontend typecheck/build
+on every push and PR; and additional edge-case test coverage
+(`tests/test_edge_cases.py`) for boundary contract structures and malformed
+API requests.
+
 Tables and endpoints for later phases (a genuine multi-season historical
 contract archive, team needs, competitive-timeline classification) are
 intentionally **not** built yet, per the roadmap's phased approach and the

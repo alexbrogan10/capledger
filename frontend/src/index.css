@@ -13,3 +13,12 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+@media print {
+  header, footer, nav {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

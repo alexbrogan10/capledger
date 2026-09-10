@@ -60,12 +60,20 @@ export function PlayerProfile() {
             {profile.player.experience} yrs experience
           </p>
         </div>
-        <Link
-          to={`/release-calculator/${profile.contract_id}`}
-          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-light"
-        >
-          Model a Release →
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to={`/contract-report/${profile.player.id}`}
+            className="rounded border border-ink-200 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
+          >
+            Decision Report
+          </Link>
+          <Link
+            to={`/release-calculator/${profile.contract_id}`}
+            className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-light"
+          >
+            Model a Release →
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
