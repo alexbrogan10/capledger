@@ -9,6 +9,7 @@ from app.services.cap_engine import (
     calculate_restructure,
     calculate_trade_impact,
     compute_cap_hit,
+    estimate_rookie_contract_terms,
     signing_bonus_proration,
     structure_contract_years,
     summarize_team_cap,
@@ -303,3 +304,32 @@ class TestExtension:
         )
         assert result.current_contract_years == []
         assert len(result.combined_years) == 1
+
+
+class TestRookieContractEstimation:
+    def test_first_round_costs_more_than_seventh_round(self):
+        r1 = estimate_rookie_contract_terms(1)
+        r7 = estimate_rookie_contract_terms(7)
+        assert r1.total_value > r7.total_value
+        assert r1.guaranteed_money > r7.guaranteed_money
+
+    def test_guaranteed_and_bonus_never_exceed_total_value(self):
+        for round_num in range(1, 8):
+            terms = estimate_rookie_contract_terms(round_num)
+            assert terms.signing_bonus <= terms.total_value
+            assert terms.guaranteed_money <= terms.total_value
+
+    def test_rejects_invalid_round(self):
+        with pytest.raises(ValueError):
+            estimate_rookie_contract_terms(8)
+        with pytest.raises(ValueError):
+            estimate_rookie_contract_terms(0)
+
+    def test_terms_feed_structure_contract_years_cleanly(self):
+        terms = estimate_rookie_contract_terms(1)
+        years = structure_contract_years(
+            start_season=2026, length_years=terms.length_years, total_value=terms.total_value,
+            signing_bonus=terms.signing_bonus, guaranteed_money=terms.guaranteed_money,
+        )
+        assert len(years) == terms.length_years
+        assert round(sum(y.base_salary for y in years) + terms.signing_bonus, 2) == terms.total_value

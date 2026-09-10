@@ -104,6 +104,20 @@ conceptually distinct rather than treating them as the same number.
   allocation charted against the league average, with the exact percentage
   differences.
 
+**Phase 4 — Scenario Analysis**
+
+- **Financial Flexibility Forecast** — the Flexibility Score projected
+  across every season in the window, with an adjustable growth-rate
+  assumption, an automatically generated explanation of the biggest
+  season-over-season change, and a genuine sensitivity comparison at a lower
+  and higher growth rate ("what would change our mind").
+- **Free-Agent Planning** — model signing a hypothetical free agent (target
+  position, AAV, length, guaranteed money) and see the year-by-year cap hit
+  plus before/after cap space and flexibility.
+- **Rookie Contract Planning** — add draft picks by round and see the
+  combined first-year cap impact, using a simplified (clearly labeled)
+  per-round cost estimate rather than the real rookie wage scale.
+
 ## Screenshots
 
 | Dashboard | Cap Overview |
@@ -122,7 +136,11 @@ conceptually distinct rather than treating them as the same number.
 |---|---|
 | ![Financial Flexibility](docs/screenshots/financial_flexibility.png) | ![Position Spending](docs/screenshots/position_spending.png) |
 
-Roster Ledger, Contract Explorer, and the Extension Simulator: see `docs/screenshots/`.
+| Financial Flexibility Forecast | Free-Agent Planning |
+|---|---|
+| ![Flexibility Forecast](docs/screenshots/flexibility_forecast.png) | ![Free-Agent Planning](docs/screenshots/free_agent_planning.png) |
+
+Roster Ledger, Contract Explorer, the Extension Simulator, and Rookie Planning: see `docs/screenshots/`.
 
 ## Technology stack
 
@@ -279,6 +297,9 @@ GET  /api/analytics/concentration?team_id=&season=
 GET  /api/analytics/contract-risk?contract_id=&season=
 GET  /api/analytics/contract-value?contract_id=
 GET  /api/analytics/position-spending-comparison?team_id=&season=
+GET  /api/teams/{id}/financial-flexibility-forecast?growth_rate=&sensitivity_delta=
+POST /api/teams/{id}/free-agent-planning  { position, target_aav, contract_length, guaranteed_money, start_season }
+POST /api/teams/{id}/rookie-planning      { season, picks: [{ draft_round, position? }] }
 ```
 
 ## Testing
@@ -289,7 +310,7 @@ source venv/bin/activate
 python -m pytest -q
 ```
 
-98 tests across three suites:
+108 tests across three suites:
 
 - `tests/test_cap_engine.py` — hand-calculated scenarios for signing-bonus
   proration, cap hits, standard/post-June-1 dead cap, restructuring
@@ -306,8 +327,10 @@ python -m pytest -q
   database: teams, players, contracts, release/restructure/trade/extension
   endpoints, the scenario comparison and cap-projection endpoints
   (including that a higher growth rate yields more future space), the
-  dead-cap dashboard, the Phase 3 analytics endpoints, validation errors,
-  and 404s.
+  dead-cap dashboard, the Phase 3 analytics endpoints, the Phase 4
+  flexibility-forecast/free-agent/rookie-planning endpoints (including that
+  the current season is provably unaffected by the growth-rate assumption),
+  validation errors, and 404s.
 
 All financial calculations are covered by tests using known, independently
 verifiable inputs and outputs — see `test_cap_engine.py` for the worked
@@ -344,19 +367,25 @@ demo dataset does not have — see `docs/contract_risk_methodology.md` and
 
 ## Roadmap
 
-This repository covers Phase 1 (MVP: select a team → view cap situation →
-view roster/contracts → select a player → model a release), Phase 2
-(Contract Strategy: restructure, extension, and trade simulators; an
-automatic Keep/Restructure/Release/Trade comparison; adjustable-assumption
-cap projections; a dead-cap dashboard; and scenario auditability), and
-Phase 3 (Financial Intelligence: a Financial Flexibility score, financial
-concentration, contract risk, contract-vs-market value comparison, and
-position spending vs. league average). Later phases (see the project brief)
-add multi-year scenario sensitivity analysis, "what would change our mind"
-framing, free-agent/rookie contract planning, historical-contract
-comparisons, competitive-timeline classification, and optional ML-assisted
-contract-value models — each layered on top of the same deterministic cap
-engine and schema built here.
+This repository covers:
+
+- **Phase 1 (MVP)** — select a team → view cap situation → view
+  roster/contracts → select a player → model a release.
+- **Phase 2 (Contract Strategy)** — restructure, extension, and trade
+  simulators; an automatic Keep/Restructure/Release/Trade comparison;
+  adjustable-assumption cap projections; a dead-cap dashboard; and scenario
+  auditability.
+- **Phase 3 (Financial Intelligence)** — a Financial Flexibility score,
+  financial concentration, contract risk, contract-vs-market value
+  comparison, and position spending vs. league average.
+- **Phase 4 (Scenario Analysis)** — a multi-year Financial Flexibility
+  Forecast with genuine growth-rate sensitivity and "what would change our
+  mind" framing, free-agent planning, and rookie contract planning.
+
+Later phases (see the project brief) add historical-contract comparisons,
+competitive-timeline classification, and optional ML-assisted contract-value
+models — each layered on top of the same deterministic cap engine and schema
+built here.
 
 ## Independent-project disclaimer
 

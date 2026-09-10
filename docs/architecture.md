@@ -96,6 +96,16 @@ Spending vs. league average. All Phase 3 scoring lives in
 `app/services/financial_intelligence.py`, following the same
 deterministic-and-tested pattern as the cap engine.
 
+**Phase 4** — Scenario Analysis: a Financial Flexibility Forecast across the
+full projection window with growth-rate sensitivity and an automatic "what
+would change our mind" comparison (`GET /api/teams/{id}/financial-flexibility-forecast`);
+Free-Agent Planning (`POST /api/teams/{id}/free-agent-planning`, hypothetical
+signing → before/after cap space and flexibility); and Rookie Contract
+Planning (`POST /api/teams/{id}/rookie-planning`, a simplified per-round
+rookie-cost estimate → cap impact of drafting several players). All three
+reuse the same `cap_engine` and `financial_intelligence` primitives rather
+than introducing new calculation logic.
+
 Tables and endpoints for later phases (historical contracts, team needs,
 competitive-timeline classification, ML-driven contract value models) are
 intentionally **not** built yet, per the roadmap's phased approach and the

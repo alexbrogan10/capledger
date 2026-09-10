@@ -8,6 +8,8 @@ import type {
   DeadCapDashboard,
   ExtensionImpact,
   FinancialFlexibility,
+  FlexibilityForecast,
+  FreeAgentPlanning,
   Meta,
   PlayerContractProfile,
   PlayerListItem,
@@ -15,6 +17,7 @@ import type {
   PositionSpendingComparison,
   ReleaseImpact,
   RestructureImpact,
+  RookiePlanning,
   RosterRow,
   ScenarioComparison,
   Team,
@@ -125,4 +128,18 @@ export const api = {
 
   positionSpendingComparison: (teamId: number, season: number) =>
     get<PositionSpendingComparison>("/analytics/position-spending-comparison", { team_id: teamId, season }),
+
+  flexibilityForecast: (teamId: number, growthRate: number, sensitivityDelta?: number) =>
+    get<FlexibilityForecast>(`/teams/${teamId}/financial-flexibility-forecast`, {
+      growth_rate: growthRate,
+      sensitivity_delta: sensitivityDelta,
+    }),
+
+  freeAgentPlanning: (
+    teamId: number,
+    body: { position: string; target_aav: number; contract_length: number; guaranteed_money: number; start_season: number }
+  ) => post<FreeAgentPlanning>(`/teams/${teamId}/free-agent-planning`, body),
+
+  rookiePlanning: (teamId: number, season: number, picks: { draft_round: number; position?: string }[]) =>
+    post<RookiePlanning>(`/teams/${teamId}/rookie-planning`, { season, picks }),
 };

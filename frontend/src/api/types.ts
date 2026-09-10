@@ -345,3 +345,51 @@ export interface PositionSpendingComparison {
   season: number;
   rows: PositionSpendingComparisonRow[];
 }
+
+export interface FlexibilityForecastSeason {
+  season: number;
+  score: number;
+  top_positive_factor: string | null;
+  top_negative_factor: string | null;
+}
+
+export interface FlexibilityForecast {
+  team_id: number;
+  growth_rate: number;
+  seasons: FlexibilityForecastSeason[];
+  narrative: string[];
+  what_would_change_our_mind: string[];
+  disclaimer: string;
+}
+
+export interface FreeAgentPlanning {
+  team_id: number;
+  position: string;
+  start_season: number;
+  projected_total_value: number;
+  projected_signing_bonus: number;
+  year_by_year_cap_hit: Record<string, number>;
+  cap_space_before: number;
+  cap_space_after: number;
+  flexibility_score_before: number;
+  flexibility_score_after: number;
+  assumptions: string[];
+}
+
+export interface RookiePickImpact {
+  draft_round: number;
+  position: string | null;
+  total_value: number;
+  signing_bonus: number;
+  first_year_cap_hit: number;
+}
+
+export interface RookiePlanning {
+  team_id: number;
+  season: number;
+  picks: RookiePickImpact[];
+  total_first_year_cap_impact: number;
+  cap_space_before: number;
+  cap_space_after: number;
+  assumptions: string[];
+}

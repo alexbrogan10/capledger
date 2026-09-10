@@ -60,6 +60,18 @@ creates or destroys money — only when it counts against the cap.**
 - **Effective cap space** = `salary_cap − full_roster_commitments − dead_cap`
   (space once every roster spot counts, not just the top 51).
 
+## Rookie contract estimation (Phase 4)
+
+`estimate_rookie_contract_terms()` provides a **simplified, per-round flat
+estimate** of a rookie contract's top-line terms (length, total value,
+signing bonus, guaranteed money) — used by the Rookie Contract Planning
+endpoint (`POST /api/teams/{id}/rookie-planning`). This is explicitly **not**
+the real NFL rookie wage scale, which is set by a CBA-defined formula that
+varies continuously by exact draft pick, not just round. All rookie deals
+are modeled as standard 4-year contracts (no fifth-year option). The
+resulting terms are run through `structure_contract_years()` just like any
+other hypothetical contract.
+
 ## What is intentionally simplified
 
 See `docs/limitations.md` for the full list. In short: no void years, no

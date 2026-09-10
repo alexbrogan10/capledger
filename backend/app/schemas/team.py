@@ -103,6 +103,72 @@ class DeadCapDashboardOut(BaseModel):
     by_season: list[DeadCapSeasonRow]
 
 
+class FlexibilityForecastSeasonOut(BaseModel):
+    season: int
+    score: float
+    top_positive_factor: str | None
+    top_negative_factor: str | None
+
+
+class FlexibilityForecastOut(BaseModel):
+    team_id: int
+    growth_rate: float
+    seasons: list[FlexibilityForecastSeasonOut]
+    narrative: list[str]
+    what_would_change_our_mind: list[str]
+    disclaimer: str
+
+
+class FreeAgentPlanningRequest(BaseModel):
+    position: str
+    target_aav: float = Field(..., gt=0)
+    contract_length: int = Field(..., gt=0, le=7)
+    guaranteed_money: float = Field(..., ge=0)
+    start_season: int
+
+
+class FreeAgentPlanningOut(BaseModel):
+    team_id: int
+    position: str
+    start_season: int
+    projected_total_value: float
+    projected_signing_bonus: float
+    year_by_year_cap_hit: dict[int, float]
+    cap_space_before: float
+    cap_space_after: float
+    flexibility_score_before: float
+    flexibility_score_after: float
+    assumptions: list[str]
+
+
+class RookiePick(BaseModel):
+    draft_round: int = Field(..., ge=1, le=7)
+    position: str | None = None
+
+
+class RookiePlanningRequest(BaseModel):
+    season: int
+    picks: list[RookiePick]
+
+
+class RookiePickImpact(BaseModel):
+    draft_round: int
+    position: str | None
+    total_value: float
+    signing_bonus: float
+    first_year_cap_hit: float
+
+
+class RookiePlanningOut(BaseModel):
+    team_id: int
+    season: int
+    picks: list[RookiePickImpact]
+    total_first_year_cap_impact: float
+    cap_space_before: float
+    cap_space_after: float
+    assumptions: list[str]
+
+
 class DashboardOut(BaseModel):
     team: TeamOut
     season: int

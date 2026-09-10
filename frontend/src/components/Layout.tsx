@@ -27,12 +27,15 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
     items: [
       { to: "/cap-projection", label: "Cap Projection" },
       { to: "/dead-cap", label: "Dead-Cap Dashboard" },
+      { to: "/free-agent-planning", label: "Free-Agent Planning" },
+      { to: "/rookie-planning", label: "Rookie Planning" },
     ],
   },
   {
     label: "Intelligence",
     items: [
       { to: "/financial-flexibility", label: "Financial Flexibility" },
+      { to: "/flexibility-forecast", label: "Flexibility Forecast" },
       { to: "/position-spending", label: "Position Spending" },
     ],
   },

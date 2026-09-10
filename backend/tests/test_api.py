@@ -355,6 +355,63 @@ class TestAnalyticsAPI:
             )
 
 
+class TestPhase4API:
+    def test_flexibility_forecast_covers_all_seasons(self, client):
+        resp = client.get("/api/teams/1/financial-flexibility-forecast", params={"growth_rate": 0.06})
+        assert resp.status_code == 200
+        body = resp.json()
+        seasons = [s["season"] for s in body["seasons"]]
+        assert seasons == sorted(seasons)
+        assert len(body["what_would_change_our_mind"]) >= 1
+        for s in body["seasons"]:
+            assert 0 <= s["score"] <= 100
+
+    def test_flexibility_forecast_current_season_unaffected_by_growth_rate(self, client):
+        # years_from_base == 0 for the current season, so growth rate cannot move it.
+        low = client.get("/api/teams/1/financial-flexibility-forecast", params={"growth_rate": 0.01}).json()
+        high = client.get("/api/teams/1/financial-flexibility-forecast", params={"growth_rate": 0.10}).json()
+        assert low["seasons"][0]["score"] == high["seasons"][0]["score"]
+
+    def test_free_agent_planning_reduces_cap_space(self, client):
+        resp = client.post(
+            "/api/teams/1/free-agent-planning",
+            json={
+                "position": "WR", "target_aav": 18_000_000, "contract_length": 3,
+                "guaranteed_money": 30_000_000, "start_season": CURRENT_SEASON,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["cap_space_after"] < body["cap_space_before"]
+        assert len(body["year_by_year_cap_hit"]) == 3
+        assert body["projected_total_value"] == 18_000_000 * 3
+
+    def test_free_agent_planning_404_missing_season(self, client):
+        resp = client.post(
+            "/api/teams/1/free-agent-planning",
+            json={"position": "WR", "target_aav": 1, "contract_length": 1, "guaranteed_money": 0, "start_season": 1999},
+        )
+        assert resp.status_code == 404
+
+    def test_rookie_planning_first_round_costs_more_than_seventh(self, client):
+        resp = client.post(
+            "/api/teams/1/rookie-planning",
+            json={"season": CURRENT_SEASON, "picks": [{"draft_round": 1}, {"draft_round": 7}]},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        picks_by_round = {p["draft_round"]: p for p in body["picks"]}
+        assert picks_by_round[1]["first_year_cap_hit"] > picks_by_round[7]["first_year_cap_hit"]
+        assert body["cap_space_after"] < body["cap_space_before"]
+
+    def test_rookie_planning_rejects_invalid_round(self, client):
+        resp = client.post(
+            "/api/teams/1/rookie-planning",
+            json={"season": CURRENT_SEASON, "picks": [{"draft_round": 9}]},
+        )
+        assert resp.status_code == 422  # pydantic field validation (le=7)
+
+
 class TestHealthAndMeta:
     def test_health(self, client):
         assert client.get("/api/health").status_code == 200

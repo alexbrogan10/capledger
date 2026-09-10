@@ -41,6 +41,33 @@ weight, a `+`/`-`/`~` direction, and a plain-language detail sentence — the
 a transparent, hand-verifiable formula, not an opaque or ML-driven output;
 see `backend/tests/test_financial_intelligence.py` for worked examples.
 
+## Financial Flexibility Forecast & Sensitivity (Phase 4)
+
+`GET /api/teams/{id}/financial-flexibility-forecast` projects the same
+scoring formula across the multi-year window (project brief section 28),
+using each future season's projected league cap (`base_cap × (1 +
+growth_rate) ^ years_from_base`) and that season's already-committed
+contracts, dead cap, and guarantees. Because the current season's
+`years_from_base` is 0, its score is unaffected by the growth-rate
+assumption — only future seasons move.
+
+**Sensitivity analysis** (section 33): the endpoint also runs the forecast
+at `growth_rate - sensitivity_delta` and `growth_rate + sensitivity_delta`
+(default ±3 points) and reports whichever season shows the largest score
+swing between the two. When every season's factors are already at their
+scored ceiling or floor (a real, observed outcome for teams whose demo-data
+commitments taper off quickly in later years — see
+`docs/data_sources.md`), the score is genuinely insensitive to the growth
+assumption in that range, and the endpoint says so plainly rather than
+reporting a misleading non-zero difference.
+
+**"What would change our mind"** (section 34): phrased directly from that
+sensitivity comparison — e.g. "a lower cap-growth assumption would put 2027
+flexibility at 84 instead of 89." The **narrative** field separately
+explains season-over-season *changes* within the base forecast (≥8-point
+swings), naming the single factor whose delta moved most between the two
+seasons.
+
 ## Related: Financial Concentration
 
 `calculate_financial_concentration()` (`GET /api/analytics/concentration`)

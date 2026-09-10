@@ -483,3 +483,48 @@ def summarize_team_cap(
         available_cap_space=available_cap_space,
         effective_cap_space=effective_cap_space,
     )
+
+
+# ---------------------------------------------------------------------------
+# Rookie contract estimation (Phase 4)
+# ---------------------------------------------------------------------------
+
+# A SIMPLIFIED, per-round flat estimate — NOT the real NFL rookie wage scale
+# (which varies continuously by exact pick, not just round, and is set by a
+# CBA-defined formula). This is a documented planning assumption for
+# modeling "what if we draft in rounds X, Y, Z," not a claim of accuracy for
+# any specific pick. All figures are illustrative/synthetic.
+ROOKIE_ROUND_ESTIMATES: dict[int, dict[str, float]] = {
+    1: {"length": 4, "total_value": 12_000_000, "signing_bonus_pct": 0.90, "guaranteed_pct": 0.95},
+    2: {"length": 4, "total_value": 6_000_000, "signing_bonus_pct": 0.80, "guaranteed_pct": 0.85},
+    3: {"length": 4, "total_value": 4_800_000, "signing_bonus_pct": 0.60, "guaranteed_pct": 0.65},
+    4: {"length": 4, "total_value": 4_400_000, "signing_bonus_pct": 0.50, "guaranteed_pct": 0.50},
+    5: {"length": 4, "total_value": 4_100_000, "signing_bonus_pct": 0.40, "guaranteed_pct": 0.40},
+    6: {"length": 4, "total_value": 3_950_000, "signing_bonus_pct": 0.30, "guaranteed_pct": 0.30},
+    7: {"length": 4, "total_value": 3_850_000, "signing_bonus_pct": 0.25, "guaranteed_pct": 0.25},
+}
+
+
+@dataclass(frozen=True)
+class RookieContractTerms:
+    draft_round: int
+    length_years: int
+    total_value: float
+    signing_bonus: float
+    guaranteed_money: float
+
+
+def estimate_rookie_contract_terms(draft_round: int) -> RookieContractTerms:
+    """A simplified, round-based estimate of a rookie contract's top-line
+    terms. Rounds outside 1-7 are not valid draft rounds."""
+    if draft_round not in ROOKIE_ROUND_ESTIMATES:
+        raise ValueError("draft_round must be between 1 and 7")
+    spec = ROOKIE_ROUND_ESTIMATES[draft_round]
+    total_value = spec["total_value"]
+    return RookieContractTerms(
+        draft_round=draft_round,
+        length_years=int(spec["length"]),
+        total_value=total_value,
+        signing_bonus=round2(total_value * spec["signing_bonus_pct"]),
+        guaranteed_money=round2(total_value * spec["guaranteed_pct"]),
+    )
