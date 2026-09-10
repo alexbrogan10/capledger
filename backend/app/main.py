@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import contracts, players, teams
+from app.api import analytics, contracts, players, teams
 from app.config import get_settings
 
 settings = get_settings()
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(teams.router)
 app.include_router(players.router)
 app.include_router(contracts.router)
+app.include_router(analytics.router)
 
 
 @app.get("/api/health")

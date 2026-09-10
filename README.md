@@ -5,11 +5,13 @@
 Cap Ledger is a portfolio, decision-support platform for NFL salary-cap and
 contract analytics — the first component of a planned larger "NFL Front
 Office Analytics Suite." This repository implements Cap Ledger's **Phase 1
-(MVP)** and **Phase 2 (Contract Strategy)**: a working full-stack application
-covering the core cap/contract workflow end to end, plus a full suite of
-scenario simulators (restructure, extension, trade, and an automatic
-Keep/Restructure/Release/Trade comparison) and adjustable-assumption cap
-projections.
+(MVP)**, **Phase 2 (Contract Strategy)**, and **Phase 3 (Financial
+Intelligence)**: a working full-stack application covering the core
+cap/contract workflow end to end, a full suite of scenario simulators
+(restructure, extension, trade, and an automatic Keep/Restructure/Release/
+Trade comparison), adjustable-assumption cap projections, and a
+Financial Flexibility score, contract-risk scoring, and market comparisons —
+all deterministic and transparent, with no ML in the calculation path.
 
 > **DEMO DATA — NOT OFFICIAL NFL DATA.** Every player, roster, and contract
 > figure in this repository is synthetically generated (see
@@ -83,6 +85,25 @@ conceptually distinct rather than treating them as the same number.
   trade is persisted with its exact inputs, outputs, and cap-engine version
   (`contract_scenarios` table), so past "what-if" runs stay reproducible.
 
+**Phase 3 — Financial Intelligence**
+
+- **Financial Flexibility Score** — a transparent, weighted 0–100 score
+  combining cap space, dead-cap exposure, future guaranteed commitments,
+  expiring contracts, and cap concentration, with a live "Why" breakdown and
+  adjustable weight sliders. Deliberately distinct from cap space alone.
+- **Financial Concentration** — what share of the cap sits in the top
+  1/3/5/10 contracts.
+- **Contract Risk** — a transparent, non-ML structural risk score (age vs.
+  position, contract length, guaranteed money, future cap concentration),
+  shown on every Player Contract Profile.
+- **Contract Value / Market Analysis** — compares a contract's AAV to other
+  active contracts at the same position (and a similar age) in the dataset —
+  an honest internal market comparison, since the demo dataset has no real
+  performance data to compare against.
+- **Position Spending vs. League Average** — a team's positional cap
+  allocation charted against the league average, with the exact percentage
+  differences.
+
 ## Screenshots
 
 | Dashboard | Cap Overview |
@@ -96,6 +117,10 @@ conceptually distinct rather than treating them as the same number.
 | "What Should We Do?" Scenario Builder | Cap Projection |
 |---|---|
 | ![Scenario Builder](docs/screenshots/scenario_builder.png) | ![Cap Projection](docs/screenshots/cap_projection.png) |
+
+| Financial Flexibility | Position Spending vs. League Average |
+|---|---|
+| ![Financial Flexibility](docs/screenshots/financial_flexibility.png) | ![Position Spending](docs/screenshots/position_spending.png) |
 
 Roster Ledger, Contract Explorer, and the Extension Simulator: see `docs/screenshots/`.
 
@@ -164,8 +189,11 @@ phases — see
   [`docs/trade_methodology.md`](docs/trade_methodology.md) — the four
   implemented scenario simulators.
 - [`docs/financial_flexibility.md`](docs/financial_flexibility.md),
-  [`docs/ml_documentation.md`](docs/ml_documentation.md) — not yet
-  implemented; documented as reserved for later phases.
+  [`docs/contract_risk_methodology.md`](docs/contract_risk_methodology.md),
+  [`docs/contract_value_methodology.md`](docs/contract_value_methodology.md)
+  — the Phase 3 scoring methodologies (all deterministic, no ML).
+- [`docs/ml_documentation.md`](docs/ml_documentation.md) — not yet
+  implemented; documented as reserved for Phase 5.
 - [`docs/limitations.md`](docs/limitations.md) — every known simplification.
 
 ## Data sources
@@ -246,6 +274,11 @@ POST /api/contracts/{id}/extend       { extension_start_season, new_length_years
 GET  /api/contracts/{id}/scenarios?season=YYYY
 POST /api/teams/{id}/projections      { growth_rate, seasons? }
 GET  /api/teams/{id}/dead-cap?season=YYYY
+GET  /api/analytics/financial-flexibility?team_id=&season=&w_cap_space=&w_dead_cap=...
+GET  /api/analytics/concentration?team_id=&season=
+GET  /api/analytics/contract-risk?contract_id=&season=
+GET  /api/analytics/contract-value?contract_id=
+GET  /api/analytics/position-spending-comparison?team_id=&season=
 ```
 
 ## Testing
@@ -256,7 +289,7 @@ source venv/bin/activate
 python -m pytest -q
 ```
 
-71 tests across two suites:
+98 tests across three suites:
 
 - `tests/test_cap_engine.py` — hand-calculated scenarios for signing-bonus
   proration, cap hits, standard/post-June-1 dead cap, restructuring
@@ -264,11 +297,17 @@ python -m pytest -q
   (trading-team dead cap matches a standard release; acquiring-team hits
   exclude proration), contract extensions, and team-cap rollups (top-51
   rule, negative cap space, etc.).
+- `tests/test_financial_intelligence.py` — financial concentration math,
+  financial-flexibility scoring (favorable/unfavorable inputs, custom
+  weights, score bounding), contract-risk categorization (including that a
+  position's decline age actually changes the score), and market-comparison
+  percentiles.
 - `tests/test_api.py` — end-to-end API tests against a real Postgres
   database: teams, players, contracts, release/restructure/trade/extension
   endpoints, the scenario comparison and cap-projection endpoints
   (including that a higher growth rate yields more future space), the
-  dead-cap dashboard, validation errors, and 404s.
+  dead-cap dashboard, the Phase 3 analytics endpoints, validation errors,
+  and 404s.
 
 All financial calculations are covered by tests using known, independently
 verifiable inputs and outputs — see `test_cap_engine.py` for the worked
@@ -295,23 +334,29 @@ be reproduced via `POST /api/contracts/{id}/release`.
 ## Limitations
 
 See [`docs/limitations.md`](docs/limitations.md). In short: synthetic data,
-simplified (but internally consistent) cap mechanics, no ML in this phase,
-and several later-roadmap features (Financial Flexibility scoring, contract
-efficiency/risk, historical comparisons, free-agent/rookie planning) not yet
-built.
+simplified (but internally consistent) cap mechanics, no ML anywhere in this
+version, and several later-roadmap features (historical contract
+comparisons, sensitivity analysis, free-agent/rookie planning, competitive
+timeline) not yet built. Contract Risk and Contract Value scoring are
+explicitly scoped away from player performance/production data, which the
+demo dataset does not have — see `docs/contract_risk_methodology.md` and
+`docs/contract_value_methodology.md`.
 
 ## Roadmap
 
 This repository covers Phase 1 (MVP: select a team → view cap situation →
-view roster/contracts → select a player → model a release) and Phase 2
+view roster/contracts → select a player → model a release), Phase 2
 (Contract Strategy: restructure, extension, and trade simulators; an
 automatic Keep/Restructure/Release/Trade comparison; adjustable-assumption
-cap projections; a dead-cap dashboard; and scenario auditability). Later
-phases (see the project brief) add a financial-flexibility score,
-position-spending trend analytics, contract efficiency/risk scoring,
-historical-contract comparisons, sensitivity analysis, free-agent/rookie
-planning, and optional ML-assisted contract-value models — each layered on
-top of the same deterministic cap engine and schema built here.
+cap projections; a dead-cap dashboard; and scenario auditability), and
+Phase 3 (Financial Intelligence: a Financial Flexibility score, financial
+concentration, contract risk, contract-vs-market value comparison, and
+position spending vs. league average). Later phases (see the project brief)
+add multi-year scenario sensitivity analysis, "what would change our mind"
+framing, free-agent/rookie contract planning, historical-contract
+comparisons, competitive-timeline classification, and optional ML-assisted
+contract-value models — each layered on top of the same deterministic cap
+engine and schema built here.
 
 ## Independent-project disclaimer
 

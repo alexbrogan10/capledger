@@ -1,13 +1,18 @@
 import type {
   CapProjection,
+  Concentration,
   ContractListItem,
+  ContractRisk,
+  ContractValue,
   Dashboard,
   DeadCapDashboard,
   ExtensionImpact,
+  FinancialFlexibility,
   Meta,
   PlayerContractProfile,
   PlayerListItem,
   PositionSpending,
+  PositionSpendingComparison,
   ReleaseImpact,
   RestructureImpact,
   RosterRow,
@@ -99,4 +104,25 @@ export const api = {
 
   deadCapDashboard: (teamId: number, season: number) =>
     get<DeadCapDashboard>(`/teams/${teamId}/dead-cap`, { season }),
+
+  financialFlexibility: (teamId: number, season: number, weights?: Record<string, number>) =>
+    get<FinancialFlexibility>("/analytics/financial-flexibility", {
+      team_id: teamId,
+      season,
+      ...(weights
+        ? Object.fromEntries(Object.entries(weights).map(([k, v]) => [`w_${k}`, v]))
+        : {}),
+    }),
+
+  concentration: (teamId: number, season: number) =>
+    get<Concentration>("/analytics/concentration", { team_id: teamId, season }),
+
+  contractRisk: (contractId: number, season: number) =>
+    get<ContractRisk>("/analytics/contract-risk", { contract_id: contractId, season }),
+
+  contractValue: (contractId: number) =>
+    get<ContractValue>("/analytics/contract-value", { contract_id: contractId }),
+
+  positionSpendingComparison: (teamId: number, season: number) =>
+    get<PositionSpendingComparison>("/analytics/position-spending-comparison", { team_id: teamId, season }),
 };

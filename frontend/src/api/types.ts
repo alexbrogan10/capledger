@@ -265,3 +265,83 @@ export interface DeadCapDashboard {
   by_player: DeadCapPlayerRow[];
   by_season: DeadCapSeasonRow[];
 }
+
+export interface FlexibilityFactor {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+  direction: "+" | "-" | "~";
+  detail: string;
+}
+
+export interface FinancialFlexibility {
+  team_id: number;
+  season: number;
+  score: number;
+  factors: FlexibilityFactor[];
+  weights_used: Record<string, number>;
+  disclaimer: string;
+}
+
+export interface Concentration {
+  team_id: number;
+  season: number;
+  total_commitments: number;
+  top1_pct: number;
+  top3_pct: number;
+  top5_pct: number;
+  top10_pct: number;
+  top1_dollars: number;
+  top3_dollars: number;
+  top5_dollars: number;
+  top10_dollars: number;
+  interpretation: string;
+}
+
+export interface RiskFactor {
+  label: string;
+  contributes_risk: boolean;
+  detail: string;
+}
+
+export interface ContractRisk {
+  contract_id: number;
+  player_id: number;
+  player_name: string;
+  risk_score: number;
+  category: "Low" | "Moderate" | "High" | "Very High";
+  factors: RiskFactor[];
+  disclaimer: string;
+}
+
+export interface ContractValue {
+  contract_id: number;
+  player_id: number;
+  player_name: string;
+  position: string;
+  age: number;
+  aav: number;
+  position_median_aav: number;
+  percentile: number;
+  age_band_median_aav: number;
+  age_band_percentile: number;
+  sample_size: number;
+  cost_vs_position_median: number;
+  discrepancy_label: string;
+  disclaimer: string;
+}
+
+export interface PositionSpendingComparisonRow {
+  position_group: string;
+  team_cap_spending: number;
+  team_cap_percentage: number;
+  league_avg_cap_percentage: number;
+  difference: number;
+}
+
+export interface PositionSpendingComparison {
+  team_id: number;
+  season: number;
+  rows: PositionSpendingComparisonRow[];
+}

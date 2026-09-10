@@ -39,6 +39,11 @@ Office Analytics Suite"; this repository implements Cap Ledger only.
 - `services/decision_points.py` — analytical (non-predictive) flags on a
   contract's timeline: expiration, large cap-hit years, potential release
   points, possible extension windows.
+- `services/financial_intelligence.py` — Phase 3 deterministic scoring:
+  financial flexibility, financial concentration, contract risk, and
+  contract-vs-market comparison. No ML; every score is a documented,
+  hand-verifiable formula (see `docs/financial_flexibility.md`,
+  `docs/contract_risk_methodology.md`, `docs/contract_value_methodology.md`).
 - `schemas/` — Pydantic request/response models.
 - `api/` — FastAPI routers (`teams`, `players`, `contracts`).
 - `seed/` — the synthetic demo-data generator (see `docs/data_sources.md`).
@@ -80,10 +85,20 @@ simulated scenario (release/restructure/extension/trade) is persisted to a
 cap-engine version — see `docs/cap_engine.md`'s "Auditability" note and
 section 43 of the product brief.
 
+**Phase 3** — Financial Intelligence: a Financial Flexibility Score
+(deliberately distinct from cap space, configurable weighting — see
+`docs/financial_flexibility.md`), Financial Concentration (top-1/3/5/10
+share of cap), Contract Risk (a transparent, non-ML structural risk score —
+`docs/contract_risk_methodology.md`), Contract Value/Market Analysis (AAV
+vs. same-position contracts in the dataset — `docs/contract_value_methodology.md`,
+deliberately scoped away from fabricated performance data), and Position
+Spending vs. league average. All Phase 3 scoring lives in
+`app/services/financial_intelligence.py`, following the same
+deterministic-and-tested pattern as the cap engine.
+
 Tables and endpoints for later phases (historical contracts, team needs,
-position-spending as a persisted table, financial-flexibility scoring,
-contract efficiency/risk, ML-driven contract value models) are intentionally
-**not** built yet, per the roadmap's phased approach and the project's
-build-quality rule against building ahead of validated need. The schema and
-API are structured so those phases can be added without reworking earlier
-ones.
+competitive-timeline classification, ML-driven contract value models) are
+intentionally **not** built yet, per the roadmap's phased approach and the
+project's build-quality rule against building ahead of validated need. The
+schema and API are structured so those phases can be added without
+reworking earlier ones.

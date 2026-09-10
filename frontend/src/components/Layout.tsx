@@ -29,6 +29,13 @@ const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = 
       { to: "/dead-cap", label: "Dead-Cap Dashboard" },
     ],
   },
+  {
+    label: "Intelligence",
+    items: [
+      { to: "/financial-flexibility", label: "Financial Flexibility" },
+      { to: "/position-spending", label: "Position Spending" },
+    ],
+  },
 ];
 
 export function Layout() {

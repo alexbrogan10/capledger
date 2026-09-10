@@ -293,6 +293,68 @@ class TestDeadCapDashboardAPI:
         assert seasons == sorted(seasons)
 
 
+class TestAnalyticsAPI:
+    def test_financial_flexibility_score_in_range(self, client):
+        resp = client.get("/api/analytics/financial-flexibility", params={"team_id": 1, "season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert 0 <= body["score"] <= 100
+        assert len(body["factors"]) == 5
+
+    def test_financial_flexibility_custom_weights_applied(self, client):
+        resp = client.get(
+            "/api/analytics/financial-flexibility",
+            params={"team_id": 1, "season": CURRENT_SEASON, "w_cap_space": 10, "w_dead_cap": 0.1},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["weights_used"]["cap_space"] == 10.0
+        assert body["weights_used"]["dead_cap"] == 0.1
+
+    def test_financial_flexibility_404_missing_season(self, client):
+        resp = client.get("/api/analytics/financial-flexibility", params={"team_id": 1, "season": 1999})
+        assert resp.status_code == 404
+
+    def test_concentration_percentages_sum_consistently(self, client):
+        resp = client.get("/api/analytics/concentration", params={"team_id": 1, "season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["top1_pct"] <= body["top3_pct"] <= body["top5_pct"] <= body["top10_pct"] <= 100
+
+    def test_contract_risk_category_valid(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.get("/api/analytics/contract-risk", params={"contract_id": contract_id, "season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["category"] in {"Low", "Moderate", "High", "Very High"}
+        assert len(body["factors"]) == 4
+
+    def test_contract_risk_404_for_missing_contract(self, client):
+        resp = client.get("/api/analytics/contract-risk", params={"contract_id": 999999})
+        assert resp.status_code == 404
+
+    def test_contract_value_percentile_in_range(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.get("/api/analytics/contract-value", params={"contract_id": contract_id})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert 0 <= body["percentile"] <= 100
+        assert body["sample_size"] > 0
+        assert "does not use player performance" in body["disclaimer"]
+
+    def test_position_spending_comparison_has_rows(self, client):
+        resp = client.get("/api/analytics/position-spending-comparison", params={"team_id": 1, "season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["rows"]) > 0
+        for row in body["rows"]:
+            assert row["difference"] == pytest.approx(
+                row["team_cap_percentage"] - row["league_avg_cap_percentage"], abs=0.01
+            )
+
+
 class TestHealthAndMeta:
     def test_health(self, client):
         assert client.get("/api/health").status_code == 200

@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { PlayerContractProfile } from "../api/types";
+import type { ContractRisk, ContractValue, PlayerContractProfile } from "../api/types";
 import { Badge, Card, ErrorState, LoadingState, StatTile } from "../components/ui";
+import { useAppState } from "../lib/AppState";
 import { formatMoney } from "../lib/format";
 
 const BLUE = "#2a78d6";
@@ -15,20 +16,36 @@ const DECISION_TONE: Record<string, "info" | "caution" | "negative" | "neutral">
   potential_extension_window: "info",
 };
 
+const RISK_TONE: Record<string, "positive" | "info" | "caution" | "negative"> = {
+  Low: "positive",
+  Moderate: "info",
+  High: "caution",
+  "Very High": "negative",
+};
+
 export function PlayerProfile() {
   const { playerId } = useParams();
+  const { season } = useAppState();
   const [profile, setProfile] = useState<PlayerContractProfile | null>(null);
+  const [risk, setRisk] = useState<ContractRisk | null>(null);
+  const [value, setValue] = useState<ContractValue | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!playerId) return;
     setProfile(null);
+    setRisk(null);
+    setValue(null);
     setError(null);
     api
       .playerProfile(Number(playerId))
-      .then(setProfile)
+      .then((p) => {
+        setProfile(p);
+        api.contractRisk(p.contract_id, season).then(setRisk).catch(() => {});
+        api.contractValue(p.contract_id).then(setValue).catch(() => {});
+      })
       .catch((e) => setError(String(e)));
-  }, [playerId]);
+  }, [playerId, season]);
 
   if (error) return <ErrorState message={error} />;
   if (!profile) return <LoadingState />;
@@ -120,6 +137,41 @@ export function PlayerProfile() {
           ))}
         </ul>
       </Card>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {risk && (
+          <Card title="Contract Risk" subtitle="Model-identified financial risk from contract structure">
+            <div className="mb-3 flex items-center gap-3">
+              <Badge tone={RISK_TONE[risk.category] ?? "neutral"}>{risk.category}</Badge>
+              <span className="tabular text-sm text-ink-500">Risk score: {risk.risk_score}/100</span>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {risk.factors.map((f, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className={`w-4 font-bold ${f.contributes_risk ? "text-negative" : "text-ink-400"}`}>
+                    {f.contributes_risk ? "!" : "·"}
+                  </span>
+                  <span className="text-ink-600">{f.detail}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-ink-400">{risk.disclaimer}</p>
+          </Card>
+        )}
+
+        {value && (
+          <Card title="Contract Value Analysis" subtitle="AAV vs. same-position contracts in this dataset">
+            <div className="grid grid-cols-2 gap-3">
+              <StatTile label="AAV" value={formatMoney(value.aav, { compact: true })} />
+              <StatTile label="Position Median" value={formatMoney(value.position_median_aav, { compact: true })} />
+              <StatTile label="Percentile" value={`${value.percentile}th`} />
+              <StatTile label="Age-Adjusted Percentile" value={`${value.age_band_percentile}th`} />
+            </div>
+            <p className="mt-3 text-sm font-medium text-ink-800">{value.discrepancy_label}</p>
+            <p className="mt-1 text-xs text-ink-400">{value.disclaimer}</p>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

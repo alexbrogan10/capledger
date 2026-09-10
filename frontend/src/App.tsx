@@ -13,6 +13,8 @@ import { TradeCalculator } from "./pages/TradeCalculator";
 import { ScenarioBuilder } from "./pages/ScenarioBuilder";
 import { CapProjectionPage } from "./pages/CapProjectionPage";
 import { DeadCapDashboard } from "./pages/DeadCapDashboard";
+import { FinancialFlexibilityPage } from "./pages/FinancialFlexibilityPage";
+import { PositionSpendingPage } from "./pages/PositionSpendingPage";
 
 export default function App() {
   return (
@@ -33,6 +35,8 @@ export default function App() {
             <Route path="/scenario-builder" element={<ScenarioBuilder />} />
             <Route path="/cap-projection" element={<CapProjectionPage />} />
             <Route path="/dead-cap" element={<DeadCapDashboard />} />
+            <Route path="/financial-flexibility" element={<FinancialFlexibilityPage />} />
+            <Route path="/position-spending" element={<PositionSpendingPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
