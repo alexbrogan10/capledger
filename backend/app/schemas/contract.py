@@ -59,6 +59,7 @@ class ReleaseImpactOut(BaseModel):
     team_cap_after: float | None
 
     assumptions: list[str]
+    scenario_id: int | None = None
 
 
 class RestructureRequest(BaseModel):
@@ -77,3 +78,80 @@ class RestructureImpactOut(BaseModel):
     converted_amount: float
     future_cap_hit_increases: dict[int, float]
     assumptions: list[str]
+    scenario_id: int | None = None
+
+
+class TradeRequest(BaseModel):
+    trade_season: int = Field(..., description="The season the trade would take effect.")
+
+
+class TradeImpactOut(BaseModel):
+    player_id: int
+    player_name: str
+    contract_id: int
+    trade_season: int
+
+    trading_team_id: int
+    trading_team_pre_trade_cap_hit: float
+    trading_team_dead_cap: float
+    trading_team_cap_savings: float
+
+    acquiring_team_cap_hits: dict[int, float]
+    acquiring_team_total_remaining_commitment: float
+
+    assumptions: list[str]
+    scenario_id: int | None = None
+
+
+class ExtensionRequest(BaseModel):
+    extension_start_season: int = Field(..., description="First season of the new contract terms.")
+    new_length_years: int = Field(..., gt=0)
+    new_total_value: float = Field(..., gt=0)
+    new_signing_bonus: float = Field(..., ge=0)
+    new_guaranteed_money: float = Field(..., ge=0)
+
+
+class ExtensionYearOut(BaseModel):
+    season: int
+    base_salary: float
+    signing_bonus_proration: float
+    cap_hit: float
+    guaranteed_base_salary: float
+
+
+class ExtensionImpactOut(BaseModel):
+    player_id: int
+    player_name: str
+    contract_id: int
+    extension_start_season: int
+
+    current_contract_years: list[ExtensionYearOut]
+    new_contract_years: list[ExtensionYearOut]
+    combined_years: list[ExtensionYearOut]
+
+    total_new_commitment: float
+    total_new_guaranteed: float
+    first_year_cap_hit_change: float
+
+    assumptions: list[str]
+    scenario_id: int | None = None
+
+
+class ScenarioOption(BaseModel):
+    scenario_type: str  # keep | restructure | release | trade
+    label: str
+    current_year_cap_impact: float
+    """Positive = cap savings this season vs. keeping the player as-is."""
+    future_year_impact: str
+    dead_cap: float
+    assessment: str  # Strong | Favorable | Moderate | Unfavorable | Conditional
+    reasoning: list[str]
+
+
+class ScenarioComparisonOut(BaseModel):
+    player_id: int
+    player_name: str
+    contract_id: int
+    season: int
+    options: list[ScenarioOption]
+    disclaimer: str

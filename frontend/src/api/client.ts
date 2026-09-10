@@ -1,6 +1,9 @@
 import type {
+  CapProjection,
   ContractListItem,
   Dashboard,
+  DeadCapDashboard,
+  ExtensionImpact,
   Meta,
   PlayerContractProfile,
   PlayerListItem,
@@ -8,8 +11,10 @@ import type {
   ReleaseImpact,
   RestructureImpact,
   RosterRow,
+  ScenarioComparison,
   Team,
   TeamCap,
+  TradeImpact,
 } from "./types";
 
 const BASE = "/api";
@@ -71,4 +76,27 @@ export const api = {
 
   simulateRestructure: (contractId: number, restructure_season: number, amount_to_convert: number) =>
     post<RestructureImpact>(`/contracts/${contractId}/restructure`, { restructure_season, amount_to_convert }),
+
+  simulateTrade: (contractId: number, trade_season: number) =>
+    post<TradeImpact>(`/contracts/${contractId}/trade`, { trade_season }),
+
+  simulateExtension: (
+    contractId: number,
+    body: {
+      extension_start_season: number;
+      new_length_years: number;
+      new_total_value: number;
+      new_signing_bonus: number;
+      new_guaranteed_money: number;
+    }
+  ) => post<ExtensionImpact>(`/contracts/${contractId}/extend`, body),
+
+  scenarioComparison: (contractId: number, season: number) =>
+    get<ScenarioComparison>(`/contracts/${contractId}/scenarios`, { season }),
+
+  recomputeProjections: (teamId: number, growth_rate: number, seasons?: number[]) =>
+    post<CapProjection>(`/teams/${teamId}/projections`, { growth_rate, seasons }),
+
+  deadCapDashboard: (teamId: number, season: number) =>
+    get<DeadCapDashboard>(`/teams/${teamId}/dead-cap`, { season }),
 };

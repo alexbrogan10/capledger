@@ -246,6 +246,193 @@ def calculate_restructure(
     )
 
 
+def structure_contract_years(
+    start_season: int,
+    length_years: int,
+    total_value: float,
+    signing_bonus: float,
+    guaranteed_money: float,
+    escalation: float = 0.18,
+) -> list[ContractYearInput]:
+    """Build a plausible year-by-year breakdown for a contract described
+    only by its top-line terms (total value, length, signing bonus,
+    guaranteed money) — the same general structuring approach (escalating
+    base salary, prorated bonus, front-loaded guarantees) used to generate
+    Cap Ledger's demo contracts, reused here so the Extension Simulator can
+    turn a hypothetical deal's summary terms into a real cap timeline.
+
+    * The signing bonus prorates evenly across the contract, capped at 5
+      years (see ``signing_bonus_proration``).
+    * The remaining (non-bonus) cash is spread across the years with a
+      linearly increasing weight (``escalation`` per year), reflecting the
+      common practice of back-loading a contract's base salary.
+    * Guaranteed money beyond the signing bonus is assigned as guaranteed
+      base salary starting in the first season, capped each year at that
+      year's actual base salary.
+
+    This is a structuring *assumption* for turning summary terms into a
+    plausible cap schedule — not a claim that any specific real contract is
+    built this way.
+    """
+    if length_years <= 0:
+        raise ValueError("length_years must be positive")
+    if total_value < 0 or signing_bonus < 0 or guaranteed_money < 0:
+        raise ValueError("total_value, signing_bonus, and guaranteed_money cannot be negative")
+    if signing_bonus > total_value:
+        raise ValueError("signing_bonus cannot exceed total_value")
+    if guaranteed_money > total_value:
+        raise ValueError("guaranteed_money cannot exceed total_value")
+
+    proration_per_year = signing_bonus_proration(signing_bonus, length_years) if signing_bonus > 0 else 0.0
+    non_bonus_cash = round2(total_value - signing_bonus)
+
+    weights = [1.0 + escalation * i for i in range(length_years)]
+    weight_sum = sum(weights)
+    base_salaries = [round2(non_bonus_cash * (w / weight_sum)) for w in weights]
+    drift = round2(non_bonus_cash - sum(base_salaries))
+    base_salaries[-1] = round2(base_salaries[-1] + drift)
+
+    guaranteed_base_remaining = round2(max(0.0, guaranteed_money - signing_bonus))
+
+    years: list[ContractYearInput] = []
+    for i in range(length_years):
+        season = start_season + i
+        base_salary = max(0.0, base_salaries[i])
+        proration = proration_per_year if i < min(length_years, MAX_PRORATION_YEARS) else 0.0
+        guaranteed_here = round2(min(base_salary, guaranteed_base_remaining))
+        guaranteed_base_remaining = round2(guaranteed_base_remaining - guaranteed_here)
+        years.append(
+            ContractYearInput(
+                season=season,
+                base_salary=base_salary,
+                signing_bonus_proration=proration,
+                guaranteed_base_salary=guaranteed_here,
+            )
+        )
+    return years
+
+
+@dataclass(frozen=True)
+class TradeResult:
+    """Result of modeling a trade for one contract."""
+
+    trade_season: int
+
+    trading_team_pre_trade_cap_hit: float
+    trading_team_dead_cap: float
+    trading_team_cap_savings: float
+    """Cap space the trading team gains this season (pre-trade cap hit minus
+    the dead cap left behind)."""
+
+    acquiring_team_cap_hits: dict[int, float]
+    """The new cap hit the acquiring team absorbs for each remaining season
+    — base salary + roster bonus + incentives only. No signing-bonus
+    proration carries over: that money was already paid by, and stays the
+    dead-cap obligation of, the trading team."""
+
+    acquiring_team_total_remaining_commitment: float
+
+
+def calculate_trade_impact(contract_years: list[ContractYearInput], trade_season: int) -> TradeResult:
+    """Model trading a player away before ``trade_season``.
+
+    Trading team: identical dead-cap mechanics to a standard (non-June-1)
+    release — all remaining signing-bonus proration accelerates into the
+    trade season, since the NFL does not offer a June-1 designation for
+    trades.
+
+    Acquiring team: inherits the remaining *base salary* (plus any roster
+    bonus/incentives) for each remaining season, at face value — no
+    proration, since the original signing bonus was paid by, and stays on
+    the books of, the trading team.
+    """
+    remaining = sorted((cy for cy in contract_years if cy.season >= trade_season), key=lambda c: c.season)
+    if not remaining:
+        return TradeResult(
+            trade_season=trade_season,
+            trading_team_pre_trade_cap_hit=0.0,
+            trading_team_dead_cap=0.0,
+            trading_team_cap_savings=0.0,
+            acquiring_team_cap_hits={},
+            acquiring_team_total_remaining_commitment=0.0,
+        )
+
+    dead_cap_result = calculate_dead_cap(contract_years, release_season=trade_season, june1=False)
+
+    acquiring_hits = {
+        cy.season: round2(cy.base_salary + cy.roster_bonus + cy.incentives) for cy in remaining
+    }
+
+    return TradeResult(
+        trade_season=trade_season,
+        trading_team_pre_trade_cap_hit=dead_cap_result.pre_release_cap_hit,
+        trading_team_dead_cap=dead_cap_result.current_year_dead_cap,
+        trading_team_cap_savings=dead_cap_result.current_year_cap_savings,
+        acquiring_team_cap_hits=acquiring_hits,
+        acquiring_team_total_remaining_commitment=round2(sum(acquiring_hits.values())),
+    )
+
+
+@dataclass(frozen=True)
+class ExtensionResult:
+    """Result of modeling a hypothetical contract extension."""
+
+    extension_start_season: int
+    current_contract_years: list[ContractYearInput]
+    """The player's existing contract, unmodified — years before the
+    extension takes effect."""
+    new_contract_years: list[ContractYearInput]
+    """The hypothetical extension years, from ``structure_contract_years``."""
+    combined_years: list[ContractYearInput]
+    """current + new, in season order — the full post-extension timeline."""
+
+    total_new_commitment: float
+    total_new_guaranteed: float
+    first_year_cap_hit_change: float
+    """New deal's first-season cap hit minus what the final current-contract
+    season's cap hit was — shows the immediate cap-hit change the extension
+    creates."""
+
+
+def calculate_extension(
+    current_years: list[ContractYearInput],
+    extension_start_season: int,
+    new_length_years: int,
+    new_total_value: float,
+    new_signing_bonus: float,
+    new_guaranteed_money: float,
+) -> ExtensionResult:
+    """Model a hypothetical extension appended after a player's current
+    contract. All new-contract terms are hypothetical inputs supplied by the
+    user — this function does not infer or predict them."""
+    kept_current = sorted(
+        (cy for cy in current_years if cy.season < extension_start_season), key=lambda c: c.season
+    )
+    new_years = structure_contract_years(
+        start_season=extension_start_season,
+        length_years=new_length_years,
+        total_value=new_total_value,
+        signing_bonus=new_signing_bonus,
+        guaranteed_money=new_guaranteed_money,
+    )
+
+    last_current_season_years = sorted(current_years, key=lambda c: c.season)
+    prior_cap_hit = last_current_season_years[-1].cap_hit if last_current_season_years else 0.0
+    first_new_cap_hit = new_years[0].cap_hit if new_years else 0.0
+
+    combined = sorted(kept_current + new_years, key=lambda c: c.season)
+
+    return ExtensionResult(
+        extension_start_season=extension_start_season,
+        current_contract_years=kept_current,
+        new_contract_years=new_years,
+        combined_years=combined,
+        total_new_commitment=round2(new_total_value),
+        total_new_guaranteed=round2(new_guaranteed_money),
+        first_year_cap_hit_change=round2(first_new_cap_hit - prior_cap_hit),
+    )
+
+
 @dataclass(frozen=True)
 class TeamCapSummary:
     season: int

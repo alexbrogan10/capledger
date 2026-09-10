@@ -2,12 +2,33 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAppState } from "../lib/AppState";
 import { DemoBanner } from "./ui";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Dashboard" },
-  { to: "/cap-overview", label: "Cap Overview" },
-  { to: "/roster", label: "Roster Ledger" },
-  { to: "/contracts", label: "Contract Explorer" },
-  { to: "/release-calculator", label: "Release Calculator" },
+const NAV_GROUPS: { label: string; items: { to: string; label: string }[] }[] = [
+  {
+    label: "Overview",
+    items: [
+      { to: "/", label: "Dashboard" },
+      { to: "/cap-overview", label: "Cap Overview" },
+      { to: "/roster", label: "Roster Ledger" },
+      { to: "/contracts", label: "Contract Explorer" },
+    ],
+  },
+  {
+    label: "Contract Strategy",
+    items: [
+      { to: "/release-calculator", label: "Release" },
+      { to: "/restructure-simulator", label: "Restructure" },
+      { to: "/extension-simulator", label: "Extend" },
+      { to: "/trade-calculator", label: "Trade" },
+      { to: "/scenario-builder", label: "What Should We Do?" },
+    ],
+  },
+  {
+    label: "Planning",
+    items: [
+      { to: "/cap-projection", label: "Cap Projection" },
+      { to: "/dead-cap", label: "Dead-Cap Dashboard" },
+    ],
+  },
 ];
 
 export function Layout() {
@@ -53,22 +74,27 @@ export function Layout() {
             </label>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-1 px-4">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                `border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "border-accent-light text-white"
-                    : "border-transparent text-ink-300 hover:text-white"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
+        <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-1 gap-y-1 px-4 pb-1">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={group.label} className="flex flex-wrap items-center">
+              {gi > 0 && <span className="mx-2 hidden h-4 w-px bg-ink-700 sm:inline-block" aria-hidden />}
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) =>
+                    `border-b-2 px-2.5 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "border-accent-light text-white"
+                        : "border-transparent text-ink-300 hover:text-white"
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
       </header>

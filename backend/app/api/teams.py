@@ -1,22 +1,31 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.cap_projection import CapProjection
 from app.models.contract import Contract
 from app.models.contract_year import ContractYear
 from app.models.player import POSITION_GROUPS, Player
 from app.models.team import Team
 from app.models.team_cap import TeamCap
 from app.schemas.team import (
+    CapProjectionOut,
+    CapProjectionRequest,
+    CapProjectionSeasonOut,
     DashboardOut,
+    DeadCapDashboardOut,
+    DeadCapPlayerRow,
+    DeadCapSeasonRow,
     FinancialAlert,
     PositionSpendingOut,
     TeamCapOut,
     TeamOut,
 )
-from app.seed.demo_data import CURRENT_SEASON, PROJECTION_SEASONS
-from app.services.cap_engine import ContractYearInput, calculate_dead_cap
+from app.seed.demo_data import CURRENT_SEASON, DEMO_LEAGUE_CAP, PROJECTION_SEASONS
+from app.services.cap_engine import ContractYearInput, calculate_dead_cap, summarize_team_cap
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -235,4 +244,132 @@ def get_dashboard(team_id: int, season: int = Query(CURRENT_SEASON), db: Session
         position_spending=spending,
         alerts=alerts,
         top_commitments=top_commitments,
+    )
+
+
+@router.post("/{team_id}/projections", response_model=CapProjectionOut)
+def recompute_projections(team_id: int, body: CapProjectionRequest, db: Session = Depends(get_db)):
+    """Multi-year cap projection under a user-adjustable league-cap growth
+    assumption (project brief section 11). Only currently-signed contracts
+    are counted — see docs/data_sources.md for why future-season
+    commitments trend down as contracts expire. Every figure returned here
+    is clearly a projection, not a guarantee; each run is persisted to
+    ``cap_projections`` for later audit.
+    """
+    _get_team_or_404(db, team_id)
+
+    base_row = _team_cap_row(db, team_id, CURRENT_SEASON)
+    base_cap = float(base_row.salary_cap) if base_row else DEMO_LEAGUE_CAP.get(CURRENT_SEASON, 270_000_000.0)
+
+    seasons = body.seasons or [s for s in PROJECTION_SEASONS if s >= CURRENT_SEASON]
+    run_id = uuid.uuid4().hex[:12]
+
+    out_seasons: list[CapProjectionSeasonOut] = []
+    for season in sorted(set(seasons)):
+        years_from_base = season - CURRENT_SEASON
+        projected_cap = round(base_cap * ((1 + body.growth_rate) ** years_from_base), 2)
+
+        active_hits = [
+            float(cy.cap_hit)
+            for cy in (
+                db.query(ContractYear)
+                .join(Contract)
+                .filter(
+                    Contract.team_id == team_id,
+                    Contract.contract_status == "active",
+                    ContractYear.season == season,
+                )
+            )
+        ]
+        dead_cap_rows = (
+            db.query(ContractYear)
+            .join(Contract)
+            .filter(Contract.team_id == team_id, ContractYear.season == season)
+            .with_entities(ContractYear.dead_cap_value)
+            .all()
+        )
+        dead_cap_total = round(float(sum(v for (v,) in dead_cap_rows)), 2)
+
+        summary = summarize_team_cap(
+            season=season, salary_cap=projected_cap, active_cap_hits=active_hits, dead_cap=dead_cap_total
+        )
+
+        db.add(
+            CapProjection(
+                team_id=team_id,
+                season=season,
+                run_id=run_id,
+                projected_cap=summary.salary_cap,
+                projected_commitments=summary.full_roster_commitments,
+                projected_space=summary.available_cap_space,
+                assumptions={"growth_rate": body.growth_rate, "base_season": CURRENT_SEASON, "base_cap": base_cap},
+            )
+        )
+        out_seasons.append(
+            CapProjectionSeasonOut(
+                season=season,
+                projected_cap=summary.salary_cap,
+                projected_commitments=summary.full_roster_commitments,
+                projected_space=summary.available_cap_space,
+            )
+        )
+    db.commit()
+
+    return CapProjectionOut(
+        team_id=team_id,
+        base_season=CURRENT_SEASON,
+        base_cap=round(base_cap, 2),
+        growth_rate=body.growth_rate,
+        run_id=run_id,
+        seasons=out_seasons,
+        assumptions=[
+            f"League cap growth of {body.growth_rate * 100:.1f}%/year is a user-supplied assumption, "
+            "not an official NFL projection.",
+            "Only contracts already on the books are counted — real teams continuously sign new "
+            "players, so this understates real future commitments (see docs/data_sources.md).",
+            "This is a projection, not a guarantee. Re-run with a different growth rate to see how "
+            "sensitive the outlook is to that assumption.",
+        ],
+    )
+
+
+@router.get("/{team_id}/dead-cap", response_model=DeadCapDashboardOut)
+def dead_cap_dashboard(team_id: int, season: int = Query(CURRENT_SEASON), db: Session = Depends(get_db)):
+    """Dead-money dashboard: current-season dead cap by player, plus a
+    multi-season timeline of total dead cap already on the books from
+    released/traded contracts."""
+    _get_team_or_404(db, team_id)
+
+    player_rows = (
+        db.query(Player.id, Player.name, Player.position, ContractYear.season, ContractYear.dead_cap_value, Contract.contract_status)
+        .join(Contract, Contract.player_id == Player.id)
+        .join(ContractYear, ContractYear.contract_id == Contract.id)
+        .filter(Player.team_id == team_id, ContractYear.season == season, ContractYear.dead_cap_value > 0)
+        .order_by(ContractYear.dead_cap_value.desc())
+        .all()
+    )
+    by_player = [
+        DeadCapPlayerRow(
+            player_id=pid, player_name=name, position=position, season=s,
+            dead_cap_value=float(dcv), contract_status=status,
+        )
+        for pid, name, position, s, dcv, status in player_rows
+    ]
+
+    season_rows = (
+        db.query(ContractYear.season, func.sum(ContractYear.dead_cap_value))
+        .join(Contract)
+        .filter(Contract.team_id == team_id, ContractYear.season.in_(PROJECTION_SEASONS))
+        .group_by(ContractYear.season)
+        .order_by(ContractYear.season)
+        .all()
+    )
+    by_season = [DeadCapSeasonRow(season=s, dead_cap=float(total or 0)) for s, total in season_rows]
+
+    return DeadCapDashboardOut(
+        team_id=team_id,
+        current_season=season,
+        total_dead_cap_current_season=round(sum(r.dead_cap_value for r in by_player), 2),
+        by_player=by_player,
+        by_season=by_season,
     )

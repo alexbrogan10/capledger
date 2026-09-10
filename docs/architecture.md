@@ -25,8 +25,11 @@ Office Analytics Suite"; this repository implements Cap Ledger only.
 - `config.py` — `pydantic-settings`-based configuration, loaded from environment
   variables / `.env`.
 - `database.py` — SQLAlchemy engine, session factory, declarative base.
-- `models/` — ORM models for the Phase 1 schema: `Team`, `Player`, `Contract`,
-  `ContractYear`, `TeamCap`, `TeamRoster`.
+- `models/` — ORM models: `Team`, `Player`, `Contract`, `ContractYear`,
+  `TeamCap`, `TeamRoster` (Phase 1); `ContractScenario` (an audit row for
+  every simulated release/restructure/extension/trade) and `CapProjection`
+  (a stored multi-year projection run under a given growth-rate assumption)
+  (Phase 2).
 - `services/cap_engine.py` — **the deterministic, rule-based salary-cap engine.**
   This is the single source of truth for every cap-mechanics calculation
   (signing-bonus proration, cap hits, dead money, release/restructure impact,
@@ -61,20 +64,26 @@ hand-verified — there is no model in the loop for these calculations. See
 
 ## What's implemented vs. reserved for later phases
 
-The product brief describes a much larger platform (see the repository's task
-history / roadmap). This repository implements **Phase 1 (MVP)**:
+The product brief describes a much larger platform. This repository
+implements **Phase 1 (MVP)** and **Phase 2 (Contract Strategy)**:
 
-- Teams, players, contracts, contract-years, team cap sheets, rosters.
-- Executive Dashboard, Cap Overview, Roster Ledger, Contract Explorer, Player
-  Contract Profile, Release Calculator.
-- A release *and* restructure simulator (restructure was pulled forward from
-  Phase 2 because it shares the same engine and rounds out the "what should we
-  do with this contract" workflow cheaply).
+**Phase 1** — Teams, players, contracts, contract-years, team cap sheets,
+rosters; Executive Dashboard, Cap Overview, Roster Ledger, Contract Explorer,
+Player Contract Profile, Release Calculator.
 
-Tables and endpoints for later phases (historical contracts, contract
-scenarios stored to a database, cap projections with adjustable assumptions,
-team needs, position-spending as a persisted table, ML-driven contract value /
-risk models) are intentionally **not** built yet, per the roadmap's phased
-approach and the project's build-quality rule against building ahead of
-validated need. The schema and API are structured so those phases can be
-added without reworking Phase 1.
+**Phase 2** — Restructure Simulator, Extension Simulator, Trade Contract
+Calculator, a Contract Scenario Builder ("What should we do with this
+contract?" — Keep/Restructure/Release/Trade compared side by side),
+adjustable-assumption Cap Projections, and a Dead-Cap Dashboard. Every
+simulated scenario (release/restructure/extension/trade) is persisted to a
+`contract_scenarios` audit table with its exact assumptions, results, and
+cap-engine version — see `docs/cap_engine.md`'s "Auditability" note and
+section 43 of the product brief.
+
+Tables and endpoints for later phases (historical contracts, team needs,
+position-spending as a persisted table, financial-flexibility scoring,
+contract efficiency/risk, ML-driven contract value models) are intentionally
+**not** built yet, per the roadmap's phased approach and the project's
+build-quality rule against building ahead of validated need. The schema and
+API are structured so those phases can be added without reworking earlier
+ones.

@@ -169,6 +169,130 @@ class TestContractsAPI:
         assert body["current_year_savings"] == round(sum(body["future_cap_hit_increases"].values()), 2)
 
 
+class TestTradeAPI:
+    def test_trade_matches_release_dead_cap(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        trade = client.post(
+            f"/api/contracts/{contract_id}/trade", json={"trade_season": CURRENT_SEASON}
+        ).json()
+        release = client.post(
+            f"/api/contracts/{contract_id}/release", json={"release_season": CURRENT_SEASON, "june1": False}
+        ).json()
+        assert trade["trading_team_dead_cap"] == release["after_dead_cap_current_year"]
+        assert trade["trading_team_cap_savings"] == release["current_year_cap_savings"]
+
+    def test_acquiring_team_hits_exclude_proration(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        multi_year = [c for c in contracts if c["years_remaining"] >= 2]
+        contract_id = multi_year[0]["id"]
+        trade = client.post(
+            f"/api/contracts/{contract_id}/trade", json={"trade_season": CURRENT_SEASON}
+        ).json()
+        assert len(trade["acquiring_team_cap_hits"]) >= 1
+        assert trade["scenario_id"] is not None
+
+    def test_trade_nonexistent_contract_404(self, client):
+        resp = client.post("/api/contracts/999999/trade", json={"trade_season": CURRENT_SEASON})
+        assert resp.status_code == 404
+
+
+class TestExtensionAPI:
+    def test_extension_combined_timeline_includes_new_years(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.post(
+            f"/api/contracts/{contract_id}/extend",
+            json={
+                "extension_start_season": CURRENT_SEASON + 2,
+                "new_length_years": 3,
+                "new_total_value": 60_000_000,
+                "new_signing_bonus": 15_000_000,
+                "new_guaranteed_money": 30_000_000,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        combined_seasons = [y["season"] for y in body["combined_years"]]
+        assert CURRENT_SEASON + 2 in combined_seasons
+        assert CURRENT_SEASON + 4 in combined_seasons
+        assert body["total_new_commitment"] == 60_000_000.0
+        assert body["scenario_id"] is not None
+
+    def test_extension_rejects_guaranteed_exceeding_total(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.post(
+            f"/api/contracts/{contract_id}/extend",
+            json={
+                "extension_start_season": CURRENT_SEASON + 2,
+                "new_length_years": 2,
+                "new_total_value": 10_000_000,
+                "new_signing_bonus": 0,
+                "new_guaranteed_money": 20_000_000,
+            },
+        )
+        assert resp.status_code == 400
+
+
+class TestScenarioComparisonAPI:
+    def test_returns_keep_release_trade_at_minimum(self, client):
+        contracts = client.get("/api/contracts", params={"team_id": 1, "contract_status": "active"}).json()
+        contract_id = contracts[0]["id"]
+        resp = client.get(f"/api/contracts/{contract_id}/scenarios", params={"season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        scenario_types = {o["scenario_type"] for o in body["options"]}
+        assert {"keep", "release", "trade"}.issubset(scenario_types)
+        for option in body["options"]:
+            assert option["assessment"] in {"Strong", "Favorable", "Moderate", "Unfavorable", "Conditional"}
+            assert len(option["reasoning"]) > 0
+
+    def test_scenarios_404_for_missing_contract(self, client):
+        resp = client.get("/api/contracts/999999/scenarios")
+        assert resp.status_code == 404
+
+
+class TestProjectionsAPI:
+    def test_projection_base_season_matches_current_cap(self, client):
+        cap = client.get("/api/teams/1/cap", params={"season": CURRENT_SEASON}).json()
+        resp = client.post("/api/teams/1/projections", json={"growth_rate": 0.06})
+        assert resp.status_code == 200
+        body = resp.json()
+        base = next(s for s in body["seasons"] if s["season"] == CURRENT_SEASON)
+        assert base["projected_cap"] == cap["salary_cap"]
+
+    def test_higher_growth_rate_yields_more_future_space(self, client):
+        low = client.post("/api/teams/1/projections", json={"growth_rate": 0.01}).json()
+        high = client.post("/api/teams/1/projections", json={"growth_rate": 0.10}).json()
+        low_last = low["seasons"][-1]["projected_space"]
+        high_last = high["seasons"][-1]["projected_space"]
+        assert high_last > low_last
+
+    def test_custom_seasons_respected(self, client):
+        resp = client.post(
+            "/api/teams/1/projections", json={"growth_rate": 0.05, "seasons": [CURRENT_SEASON, CURRENT_SEASON + 1]}
+        )
+        body = resp.json()
+        assert [s["season"] for s in body["seasons"]] == [CURRENT_SEASON, CURRENT_SEASON + 1]
+
+
+class TestDeadCapDashboardAPI:
+    def test_dead_cap_dashboard_totals_match_sum_of_players(self, client):
+        resp = client.get("/api/teams/1/dead-cap", params={"season": CURRENT_SEASON})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_dead_cap_current_season"] == pytest.approx(
+            sum(r["dead_cap_value"] for r in body["by_player"]), abs=0.01
+        )
+
+    def test_dead_cap_by_season_covers_projection_window(self, client):
+        resp = client.get("/api/teams/1/dead-cap", params={"season": CURRENT_SEASON})
+        body = resp.json()
+        seasons = [row["season"] for row in body["by_season"]]
+        assert seasons == sorted(seasons)
+
+
 class TestHealthAndMeta:
     def test_health(self, client):
         assert client.get("/api/health").status_code == 200

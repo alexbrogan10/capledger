@@ -7,6 +7,12 @@ import { RosterLedger } from "./pages/RosterLedger";
 import { ContractExplorer } from "./pages/ContractExplorer";
 import { PlayerProfile } from "./pages/PlayerProfile";
 import { ReleaseCalculator } from "./pages/ReleaseCalculator";
+import { RestructureSimulator } from "./pages/RestructureSimulator";
+import { ExtensionSimulator } from "./pages/ExtensionSimulator";
+import { TradeCalculator } from "./pages/TradeCalculator";
+import { ScenarioBuilder } from "./pages/ScenarioBuilder";
+import { CapProjectionPage } from "./pages/CapProjectionPage";
+import { DeadCapDashboard } from "./pages/DeadCapDashboard";
 
 export default function App() {
   return (
@@ -21,6 +27,12 @@ export default function App() {
             <Route path="/players/:playerId" element={<PlayerProfile />} />
             <Route path="/release-calculator" element={<ReleaseCalculator />} />
             <Route path="/release-calculator/:contractId" element={<ReleaseCalculator />} />
+            <Route path="/restructure-simulator" element={<RestructureSimulator />} />
+            <Route path="/extension-simulator" element={<ExtensionSimulator />} />
+            <Route path="/trade-calculator" element={<TradeCalculator />} />
+            <Route path="/scenario-builder" element={<ScenarioBuilder />} />
+            <Route path="/cap-projection" element={<CapProjectionPage />} />
+            <Route path="/dead-cap" element={<DeadCapDashboard />} />
           </Route>
         </Routes>
       </BrowserRouter>

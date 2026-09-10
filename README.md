@@ -5,8 +5,11 @@
 Cap Ledger is a portfolio, decision-support platform for NFL salary-cap and
 contract analytics — the first component of a planned larger "NFL Front
 Office Analytics Suite." This repository implements Cap Ledger's **Phase 1
-MVP**: a working full-stack application covering the core cap/contract
-workflow end to end.
+(MVP)** and **Phase 2 (Contract Strategy)**: a working full-stack application
+covering the core cap/contract workflow end to end, plus a full suite of
+scenario simulators (restructure, extension, trade, and an automatic
+Keep/Restructure/Release/Trade comparison) and adjustable-assumption cap
+projections.
 
 > **DEMO DATA — NOT OFFICIAL NFL DATA.** Every player, roster, and contract
 > figure in this repository is synthetically generated (see
@@ -39,7 +42,9 @@ conceptually distinct rather than treating them as the same number.
   or extension costs now and what it creates later. It does not declare a
   contract "good" or "bad," or a transaction automatically beneficial.
 
-## Key features (Phase 1)
+## Key features
+
+**Phase 1 — MVP**
 
 - **Front Office Dashboard** — current cap position, projected cap space
   through 2030, financial alerts, and position-group spending.
@@ -54,9 +59,29 @@ conceptually distinct rather than treating them as the same number.
   release points, possible extension windows).
 - **Release Calculator** — standard vs. post-June 1 release modeling, with
   before/after cap hit, dead cap, savings, and resulting team cap position.
-- **Restructure Simulator** — models converting base salary into bonus
-  proration, showing the current-year savings and exactly which future
-  seasons absorb the cost.
+
+**Phase 2 — Contract Strategy**
+
+- **Restructure Simulator** — converts base salary into bonus proration;
+  shows the current-year savings and exactly which future seasons absorb the
+  cost (the two always match exactly — enforced by a unit test).
+- **Extension Simulator** — model a hypothetical extension with your own
+  terms (years, total value, bonus, guarantees) and see the combined
+  current-contract + extension timeline as a chart.
+- **Trade Contract Calculator** — dead cap/savings for the trading team, and
+  the cap hit an acquiring team would absorb (base salary only — no
+  proration carries over).
+- **"What Should We Do With This Contract?"** — automatically compares Keep
+  / Restructure / Release / Trade side by side, each with a transparent,
+  threshold-based assessment and its reasoning spelled out.
+- **Cap Projection** — multi-year projection with a live-adjustable league
+  cap growth-rate slider, so you can see how sensitive the outlook is to that
+  assumption.
+- **Dead-Cap Dashboard** — current dead cap by player, plus a multi-season
+  timeline.
+- **Scenario auditability** — every simulated release/restructure/extension/
+  trade is persisted with its exact inputs, outputs, and cap-engine version
+  (`contract_scenarios` table), so past "what-if" runs stay reproducible.
 
 ## Screenshots
 
@@ -68,7 +93,11 @@ conceptually distinct rather than treating them as the same number.
 |---|---|
 | ![Player Profile](docs/screenshots/player_profile.png) | ![Release Calculator](docs/screenshots/release_calculator.png) |
 
-Roster Ledger and Contract Explorer: see `docs/screenshots/`.
+| "What Should We Do?" Scenario Builder | Cap Projection |
+|---|---|
+| ![Scenario Builder](docs/screenshots/scenario_builder.png) | ![Cap Projection](docs/screenshots/cap_projection.png) |
+
+Roster Ledger, Contract Explorer, and the Extension Simulator: see `docs/screenshots/`.
 
 ## Technology stack
 
@@ -88,13 +117,15 @@ hand-verified unit-test suite.
 
 ## Database schema
 
-Phase 1 implements six tables (see `backend/app/models/`):
+Eight tables (see `backend/app/models/`):
 
 ```
 teams ──< players ──< contracts ──< contract_years
-  │                        │
-  └──< team_cap            └── (roster status per season)
-  └──< team_rosters
+  │                        │              │
+  │                        │              └──< (dead_cap_value per season)
+  ├──< team_cap            └── contract_scenarios (audit log)
+  ├──< team_rosters
+  └──< cap_projections
 ```
 
 - **teams** — id, name, abbreviation, conference, division
@@ -108,10 +139,17 @@ teams ──< players ──< contracts ──< contract_years
 - **team_cap** — id, team_id, season, salary_cap, cap_commitments,
   top51_commitments, dead_cap, cap_space, effective_cap_space
 - **team_rosters** — id, team_id, player_id, season, roster_status
+- **contract_scenarios** *(Phase 2)* — id, player_id, team_id, contract_id,
+  scenario_type, model_version, assumptions (JSON), results (JSON),
+  created_at — an audit row for every simulated release/restructure/
+  extension/trade.
+- **cap_projections** *(Phase 2)* — id, team_id, season, run_id,
+  projected_cap, projected_commitments, projected_space, assumptions (JSON)
+  — every Cap Projection run, grouped by `run_id`.
 
 Additional tables described in the full product brief (historical contracts,
-contract scenarios, cap projections, team needs, position spending as a
-persisted table) are reserved for later phases — see
+team needs, position spending as a persisted table) are reserved for later
+phases — see
 [`docs/architecture.md`](docs/architecture.md#whats-implemented-vs-reserved-for-later-phases).
 
 ## Methodology
@@ -121,10 +159,11 @@ persisted table) are reserved for later phases — see
 - [`docs/contract_methodology.md`](docs/contract_methodology.md) — how a
   contract's fields are structured.
 - [`docs/release_methodology.md`](docs/release_methodology.md),
-  [`docs/restructure_methodology.md`](docs/restructure_methodology.md) — the
-  two implemented scenario simulators.
-- [`docs/extension_methodology.md`](docs/extension_methodology.md),
-  [`docs/financial_flexibility.md`](docs/financial_flexibility.md),
+  [`docs/restructure_methodology.md`](docs/restructure_methodology.md),
+  [`docs/extension_methodology.md`](docs/extension_methodology.md),
+  [`docs/trade_methodology.md`](docs/trade_methodology.md) — the four
+  implemented scenario simulators.
+- [`docs/financial_flexibility.md`](docs/financial_flexibility.md),
   [`docs/ml_documentation.md`](docs/ml_documentation.md) — not yet
   implemented; documented as reserved for later phases.
 - [`docs/limitations.md`](docs/limitations.md) — every known simplification.
@@ -201,6 +240,12 @@ GET  /api/contracts?team_id=&position=&search=&min_aav=&max_aav=
 GET  /api/contracts/{id}
 POST /api/contracts/{id}/release      { release_season, june1 }
 POST /api/contracts/{id}/restructure  { restructure_season, amount_to_convert }
+POST /api/contracts/{id}/trade        { trade_season }
+POST /api/contracts/{id}/extend       { extension_start_season, new_length_years,
+                                         new_total_value, new_signing_bonus, new_guaranteed_money }
+GET  /api/contracts/{id}/scenarios?season=YYYY
+POST /api/teams/{id}/projections      { growth_rate, seasons? }
+GET  /api/teams/{id}/dead-cap?season=YYYY
 ```
 
 ## Testing
@@ -211,15 +256,19 @@ source venv/bin/activate
 python -m pytest -q
 ```
 
-48 tests across two suites:
+71 tests across two suites:
 
 - `tests/test_cap_engine.py` — hand-calculated scenarios for signing-bonus
   proration, cap hits, standard/post-June-1 dead cap, restructuring
-  (including the "savings == future increase" invariant), and team-cap
-  rollups (top-51 rule, negative cap space, etc.).
+  (including the "savings == future increase" invariant), trade impact
+  (trading-team dead cap matches a standard release; acquiring-team hits
+  exclude proration), contract extensions, and team-cap rollups (top-51
+  rule, negative cap space, etc.).
 - `tests/test_api.py` — end-to-end API tests against a real Postgres
-  database (teams, players, contracts, release/restructure endpoints,
-  validation errors, 404s).
+  database: teams, players, contracts, release/restructure/trade/extension
+  endpoints, the scenario comparison and cap-projection endpoints
+  (including that a higher growth rate yields more future space), the
+  dead-cap dashboard, validation errors, and 404s.
 
 All financial calculations are covered by tests using known, independently
 verifiable inputs and outputs — see `test_cap_engine.py` for the worked
@@ -253,13 +302,16 @@ built.
 
 ## Roadmap
 
-Phase 1 (this repository) covers the MVP workflow: select a team → view cap
-situation → view roster/contracts → select a player → model a release. Later
-phases (see the project brief) add restructure/extension/trade tooling at
-greater depth, a financial-flexibility score, position-spending analytics,
-historical-contract comparisons, sensitivity analysis, and optional
-ML-assisted contract value/risk models — each layered on top of the same
-deterministic cap engine and schema built here.
+This repository covers Phase 1 (MVP: select a team → view cap situation →
+view roster/contracts → select a player → model a release) and Phase 2
+(Contract Strategy: restructure, extension, and trade simulators; an
+automatic Keep/Restructure/Release/Trade comparison; adjustable-assumption
+cap projections; a dead-cap dashboard; and scenario auditability). Later
+phases (see the project brief) add a financial-flexibility score,
+position-spending trend analytics, contract efficiency/risk scoring,
+historical-contract comparisons, sensitivity analysis, free-agent/rookie
+planning, and optional ML-assisted contract-value models — each layered on
+top of the same deterministic cap engine and schema built here.
 
 ## Independent-project disclaimer
 

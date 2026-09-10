@@ -169,3 +169,99 @@ export interface Meta {
   current_season: number;
   projection_seasons: number[];
 }
+
+export interface TradeImpact {
+  player_id: number;
+  player_name: string;
+  contract_id: number;
+  trade_season: number;
+  trading_team_id: number;
+  trading_team_pre_trade_cap_hit: number;
+  trading_team_dead_cap: number;
+  trading_team_cap_savings: number;
+  acquiring_team_cap_hits: Record<string, number>;
+  acquiring_team_total_remaining_commitment: number;
+  assumptions: string[];
+  scenario_id: number | null;
+}
+
+export interface ExtensionYear {
+  season: number;
+  base_salary: number;
+  signing_bonus_proration: number;
+  cap_hit: number;
+  guaranteed_base_salary: number;
+}
+
+export interface ExtensionImpact {
+  player_id: number;
+  player_name: string;
+  contract_id: number;
+  extension_start_season: number;
+  current_contract_years: ExtensionYear[];
+  new_contract_years: ExtensionYear[];
+  combined_years: ExtensionYear[];
+  total_new_commitment: number;
+  total_new_guaranteed: number;
+  first_year_cap_hit_change: number;
+  assumptions: string[];
+  scenario_id: number | null;
+}
+
+export interface ScenarioOption {
+  scenario_type: string;
+  label: string;
+  current_year_cap_impact: number;
+  future_year_impact: string;
+  dead_cap: number;
+  assessment: "Strong" | "Favorable" | "Moderate" | "Unfavorable" | "Conditional";
+  reasoning: string[];
+}
+
+export interface ScenarioComparison {
+  player_id: number;
+  player_name: string;
+  contract_id: number;
+  season: number;
+  options: ScenarioOption[];
+  disclaimer: string;
+}
+
+export interface CapProjectionSeason {
+  season: number;
+  projected_cap: number;
+  projected_commitments: number;
+  projected_space: number;
+}
+
+export interface CapProjection {
+  team_id: number;
+  base_season: number;
+  base_cap: number;
+  growth_rate: number;
+  run_id: string;
+  seasons: CapProjectionSeason[];
+  assumptions: string[];
+}
+
+export interface DeadCapPlayerRow {
+  player_id: number;
+  player_name: string;
+  position: string;
+  season: number;
+  dead_cap_value: number;
+  contract_status: string;
+}
+
+export interface DeadCapSeasonRow {
+  season: number;
+  dead_cap: number;
+}
+
+export interface DeadCapDashboard {
+  team_id: number;
+  current_season: number;
+  total_dead_cap_current_season: number;
+  by_player: DeadCapPlayerRow[];
+  by_season: DeadCapSeasonRow[];
+}

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TeamOut(BaseModel):
@@ -55,6 +55,52 @@ class FinancialAlert(BaseModel):
     player_name: str | None = None
     season: int | None = None
     amount: float | None = None
+
+
+class CapProjectionRequest(BaseModel):
+    growth_rate: float = Field(0.06, description="Assumed year-over-year league cap growth rate.")
+    seasons: list[int] | None = Field(
+        None, description="Seasons to project; defaults to the standard projection window."
+    )
+
+
+class CapProjectionSeasonOut(BaseModel):
+    season: int
+    projected_cap: float
+    projected_commitments: float
+    projected_space: float
+
+
+class CapProjectionOut(BaseModel):
+    team_id: int
+    base_season: int
+    base_cap: float
+    growth_rate: float
+    run_id: str
+    seasons: list[CapProjectionSeasonOut]
+    assumptions: list[str]
+
+
+class DeadCapPlayerRow(BaseModel):
+    player_id: int
+    player_name: str
+    position: str
+    season: int
+    dead_cap_value: float
+    contract_status: str
+
+
+class DeadCapSeasonRow(BaseModel):
+    season: int
+    dead_cap: float
+
+
+class DeadCapDashboardOut(BaseModel):
+    team_id: int
+    current_season: int
+    total_dead_cap_current_season: float
+    by_player: list[DeadCapPlayerRow]
+    by_season: list[DeadCapSeasonRow]
 
 
 class DashboardOut(BaseModel):
